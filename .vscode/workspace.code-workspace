@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [
+			"c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SBMS",
+			"c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SBMS_1"
+		],
+		"kconfig.zephyr.west": "west",
+		"kconfig.zephyr.base": "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SDK\\v1.7.0\\zephyr",
+		"nrf-connect.toolchain.path": "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SDK\\v1.7.0\\toolchain",
+		"nrf-connect.topdir": "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SDK\\v1.7.0"
+	}
+}
