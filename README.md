@@ -9,3 +9,4 @@
 To run the BLE signal strength tool
 * Install Python 3.7.9[That specific version]
 * Install the python library called Blatann
+
