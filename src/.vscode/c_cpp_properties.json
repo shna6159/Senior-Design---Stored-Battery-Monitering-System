@@ -1,0 +1,72 @@
+{
+    "configurations": [
+        {
+            "name": "pca10040/s132",
+            "includePath": [
+                "${workspaceFolder}/pca10056/config",
+                "${workspaceFolder}/pca10059/config",
+                "${workspaceFolder}/SDK",
+                "${workspaceFolder}/SDK/components/libraries/util",
+                "${workspaceFolder}/SDK/modules/nrfx/mdk",
+                "${workspaceFolder}/SDK/components/drivers_nrf/nrf_soc_nosd",
+                "${workspaceFolder}/SDK/components/softdevice/s112/headers",
+                "${workspaceFolder}/SDK/components/ble/ble_services/ble_lbs",
+                "${workspaceFolder}/SDK/components/ble/common",
+                "${workspaceFolder}/SDK/components/softdevice/common",
+                "${workspaceFolder}/SDK/components/libraries/log",
+                "${workspaceFolder}/SDK/components/libraries/button",
+                "${workspaceFolder}/SDK/components/boards",
+                "${workspaceFolder}/SDK/components/libraries/timer",
+                "${workspaceFolder}/SDK/components/ble/nrf_ble_qwr",
+                "${workspaceFolder}/SDK/components/libraries/experimental_section_vars",
+                "${workspaceFolder}/SDK/modules/nrfx/hal",
+                "${workspaceFolder}/SDK/modules/nrfx",
+                "${workspaceFolder}/SDK/components/ble/nrf_ble_gatt",
+                "${workspaceFolder}/SDK/components/libraries/pwr_mgmt",
+                "${workspaceFolder}/SDK/integration/nrfx",
+                "${workspaceFolder}/SDK/components/libraries/log/src",
+                "${workspaceFolder}/SDK/components/libraries/strerror",
+                "${workspaceFolder}/SDK/components/libraries/memobj",
+                "${workspaceFolder}/SDK/components/libraries/balloc"
+            ],
+            // "defines": [
+            //     "BOARD_PCA10040",
+            //     "CONFIG_GPIO_AS_PINRESET",
+            //     "FLOAT_ABI_HARD",
+            //     "NRF52",
+            //     "NRF52832_XXAA",
+            //     "NRF52_PAN_74",
+            //     "NRF_SD_BLE_API_VERSION=6",
+            //     "S132",
+            //     "SOFTDEVICE_PRESENT",
+            //     "SWI_DISABLE0"
+            // ],
+            "compilerPath": "C:/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        },
+        {
+            "name": "pca10056/s140",
+            "includePath": [
+                "${workspaceFolder}/pca10056/config",
+                "${workspaceFolder}/pca10059/config"
+            ],
+            "defines": [
+                "BOARD_PCA10056",
+                "CONFIG_GPIO_AS_PINRESET",
+                "FLOAT_ABI_HARD",
+                "NRF52840_XXAA",
+                "NRF_SD_BLE_API_VERSION=6",
+                "S140",
+                "SOFTDEVICE_PRESENT",
+                "SWI_DISABLE0"
+            ],
+            "compilerPath": "C:/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 4
+}
