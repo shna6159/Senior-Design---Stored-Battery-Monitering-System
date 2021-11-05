@@ -9,7 +9,6 @@
                 "${workspaceFolder}/SDK/components/libraries/util",
                 "${workspaceFolder}/SDK/modules/nrfx/mdk",
                 "${workspaceFolder}/SDK/components/drivers_nrf/nrf_soc_nosd",
-                "${workspaceFolder}/SDK/components/softdevice/s112/headers",
                 "${workspaceFolder}/SDK/components/ble/ble_services/ble_lbs",
                 "${workspaceFolder}/SDK/components/ble/common",
                 "${workspaceFolder}/SDK/components/softdevice/common",
