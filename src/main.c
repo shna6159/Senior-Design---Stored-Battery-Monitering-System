@@ -47,9 +47,10 @@
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
 // #define TX_POWER_LEVEL -8
+#define TX_POWER_LEVEL -4
 // #define TX_POWER_LEVEL 0
 // #define TX_POWER_LEVEL 4
-#define TX_POWER_LEVEL 8
+// #define TX_POWER_LEVEL 8
 
 // #define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50)                     /**< Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
 
