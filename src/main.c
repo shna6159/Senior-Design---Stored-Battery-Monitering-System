@@ -19,7 +19,7 @@
 #include "nrf_ble_gatt.h"
 #include "nrf_ble_qwr.h"
 #include "nrf_pwr_mgmt.h"
-
+#include "nrf_delay.h"
 //  
 
 
@@ -28,8 +28,8 @@
 // #define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
 // #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-#define DEVICE_NAME                     "Deez Nutz"                         /**< Name of device. Will be included in the advertising data. */
-
+// #define DEVICE_NAME                     "Deez Nutz"                         /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "SBMS"
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -45,6 +45,11 @@
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(20000)                  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (15 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                   /**< Time between each call to sd_ble_gap_conn_param_update after the first call (5 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
+
+// #define TX_POWER_LEVEL -8
+// #define TX_POWER_LEVEL 0
+// #define TX_POWER_LEVEL 4
+#define TX_POWER_LEVEL 8
 
 // #define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50)                     /**< Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
 
@@ -341,6 +346,7 @@ static void conn_params_init(void)
  */
 static void advertising_start(void)
 {
+    sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(BSP_BOARD_LED_2);
 }
@@ -362,6 +368,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             bsp_board_led_on(BSP_BOARD_LED_3);
             bsp_board_led_off(BSP_BOARD_LED_2);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
           nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
             
             
@@ -598,10 +605,15 @@ int main(void)
     advertising_start();
 
     // Enter main loop.
-    // for (;;)
-    // {
-    //     idle_state_handle();
-    // }
+    for (;;)
+    {
+        // idle_state_handle();
+
+        send_button(0x69);
+        nrf_delay_us(3000);
+        send_button(0x07);
+        nrf_delay_us(3000);        
+    }
 }
 
 
