@@ -2,5 +2,15 @@
     "kconfig.zephyr.west": "west",
     "kconfig.zephyr.base": "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SDK\\v1.7.0\\zephyr",
     "C_Cpp.errorSquiggles": "Disabled",
-    "terminal.integrated.env.windows":  {"PATH": "${env:PATH}"}
+    "terminal.integrated.env.windows": {
+        "PATH": "${env:PATH}"
+    },
+    "files.associations": {
+        "nrf_drv_saadc.h": "c",
+        "nrf_drv_timer.h": "c",
+        "nrf_drv_ppi.h": "c",
+        "app_util_platform.h": "c",
+        "boards.h": "c",
+        "pca10059.h": "c"
+    }
 }
