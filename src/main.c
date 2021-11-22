@@ -532,13 +532,13 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 // }
 
 
-// static void log_init(void)
-// {
-//     ret_code_t err_code = NRF_LOG_INIT(NULL);
-//     APP_ERROR_CHECK(err_code);
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
 
-//     NRF_LOG_DEFAULT_BACKENDS_INIT();
-// }
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+}
 
 
 // /**@brief Function for initializing power management.
@@ -595,7 +595,7 @@ static void button_handler(uint8_t pin, uint8_t action){
 
 void timer_handler(nrf_timer_event_t event_type, void * p_context)
 {
-    NRF_LOG_INFO("Timer interrupt");
+    // NRF_LOG_INFO("Timer interrupt");
     
     NRF_SAADC->TASKS_SAMPLE = 1;
     /*
@@ -631,7 +631,7 @@ void saadc_sampling_event_init(void)
     uint32_t saadc_sample_task_addr   = nrf_drv_saadc_sample_task_get();
 
     /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
-//    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel);
+   err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel);
    APP_ERROR_CHECK(err_code);
 
    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel,
@@ -662,7 +662,7 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
         {
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+            NRF_LOG_INFO("ADC val %d", p_event->data.done.p_buffer[i]);
             // TODO: Eventually add a string here with all the data 
             send_button(p_event->data.done.p_buffer[i]);
         }
@@ -695,7 +695,8 @@ void saadc_init(void)
 int main(void)
 {
     // Initialize.
-    // log_init();
+    log_init();
+        NRF_LOG_INFO("Inniting crap");
     // power_management_init();
     bsp_board_init(BSP_INIT_LEDS);
     app_timer_init();
@@ -727,12 +728,14 @@ int main(void)
     saadc_init();
     saadc_sampling_event_init();
     // Start execution.
-    // NRF_LOG_INFO("Blinky example started.");
+    NRF_LOG_INFO("Blinky example started.");
     advertising_start();
 
     // Enter main loop.
     for (;;)
     {
+
+            NRF_LOG_PROCESS();
         // idle_state_handle();
 
         // send_button(0x69);
