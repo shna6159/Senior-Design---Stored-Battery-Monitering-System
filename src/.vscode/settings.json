@@ -12,5 +12,8 @@
         "app_util_platform.h": "c",
         "boards.h": "c",
         "pca10059.h": "c"
+    },
+    {
+        "editor.formatOnSave": true
     }
 }

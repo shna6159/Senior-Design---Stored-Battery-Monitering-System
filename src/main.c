@@ -1,4 +1,3 @@
-
 #include <stdint.h>
 #include <string.h>
 #include "nordic_common.h"
@@ -33,15 +32,23 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#define SAMPLES_IN_BUFFER 5
+#define SAMPLES_IN_BUFFER 1
 volatile uint8_t state = 1;
 
 static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
+#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
 
+typedef enum
+{
+    LOG_LEVEL_INFO  = 1,
+    LOG_LEVEL_DEBUG = 2
+} log_level;
+
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 
 // #define TX_POWER_LEVEL -8
@@ -49,13 +56,14 @@ static uint32_t              m_adc_evt_counter;
 // #define TX_POWER_LEVEL 0
 // #define TX_POWER_LEVEL 4
 #define TX_POWER_LEVEL 8
-// #define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
-// #define CONNECTED_LED                   BSP_BOARD_LED_1                         /**< Is on when device has connected. */
-// #define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
+
+#define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
+#define CONNECTED_LED                   BSP_BOARD_LED_1                         /**< Is on when device has connected. */
+#define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
+#define UNEXPECTED_LED                  BSP_BOARD_LED_3                         /**< LED to be toggled when the an error occurs */
 // #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-// #define DEVICE_NAME                     "Deez Nutz"                         /**< Name of device. Will be included in the advertising data. */
-#define DEVICE_NAME                     "SBMS"
+#define DEVICE_NAME                     "SBMS_in_box"                                  /**< Name of device. Will be included in the advertising data. */
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -82,7 +90,6 @@ static uint32_t              m_adc_evt_counter;
 // #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define UUID_BASE {0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00}
-
 #define UUID_SERVICE 0x1234
 #define UUID_BUTTON_CHAR 0x1234
 
@@ -94,6 +101,7 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
 static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];         /**< Buffer for storing an encoded scan data. */
+ble_gatts_char_handles_t button_char_handles;
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -127,27 +135,32 @@ static ble_gap_adv_data_t m_adv_data =
 //     app_error_handler(DEAD_BEEF, line_num, p_file_name);
 // }
 
+/*\
+Descripttion : Sets up all the the LEDs used by the program
+*/
+static void leds_init(void)
+{
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("LED init");
+    #endif
+    bsp_board_init(BSP_INIT_LEDS);
 
-// /**@brief Function for the LEDs initialization.
-//  *
-//  * @details Initializes all LEDs used by the application.
-//  */
-// static void leds_init(void)
-// {
-//     bsp_board_init(BSP_INIT_LEDS);
-// }
+}
 
 
 // /**@brief Function for the Timer initialization.
 //  *
 //  * @details Initializes the timer module.
 //  */
-// static void timers_init(void)
-// {
-//     // Initialize timer module, making it use the scheduler
-//     ret_code_t err_code = app_timer_init();
-//     APP_ERROR_CHECK(err_code);
-// }
+static void timers_init(void)
+{
+    // Initialize timer module, making it use the scheduler
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("TIMER init");
+    #endif
+    ret_code_t err_code = app_timer_init();
+    APP_ERROR_CHECK(err_code);
+}
 
 
 /**@brief Function for the GAP initialization.
@@ -155,7 +168,7 @@ static ble_gap_adv_data_t m_adv_data =
  * @details This function sets up all the necessary GAP (Generic Access Profile) parameters of the
  *          device including the device name, appearance, and the preferred connection parameters.
  */
-static void gap_params_init(void)
+static void ble_gap_params_init(void)
 {
     // ret_code_t              err_code;
     ble_gap_conn_params_t   gap_conn_params;
@@ -176,26 +189,30 @@ static void gap_params_init(void)
     gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
 
     sd_ble_gap_ppcp_set(&gap_conn_params);
-    
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("GAP init");
+    #endif
 }
 
 
 // /**@brief Function for initializing the GATT module.
 //  */
-// static void gatt_init(void)
-// {
-//     ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, NULL);
-//     APP_ERROR_CHECK(err_code);
-// }
+static void ble_gatt_init(void)
+{
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("GATT init");
+    #endif
+    ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, NULL);
+    APP_ERROR_CHECK(err_code);
+}
 
-ble_gatts_char_handles_t button_char_handles;
 
 /**@brief Function for initializing the Advertising functionality.
  *
  * @details Encodes the required advertising data and passes it to the stack.
  *          Also builds a structure to be passed to the stack when starting advertising.
  */
-static void advertising_init(void)
+static void ble_advertising_init(void)
 {
     ble_uuid_t ble_uuid;
     ble_add_char_params_t add_char_params;
@@ -259,7 +276,9 @@ static void advertising_init(void)
     adv_params.interval        = APP_ADV_INTERVAL;
 
      sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
-    
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("Advertising init");
+    #endif
 }
 
 
@@ -276,29 +295,9 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 }
 
 
-// /**@brief Function for handling write events to the LED characteristic.
-//  *
-//  * @param[in] p_lbs     Instance of LED Button Service to which the write applies.
-//  * @param[in] led_state Written/desired state of the LED.
-//  */
-// static void led_write_handler(uint16_t conn_handle, ble_lbs_t * p_lbs, uint8_t led_state)
-// {
-//     if (led_state)
-//     {
-//         bsp_board_led_on(LEDBUTTON_LED);
-//         NRF_LOG_INFO("Received LED ON!");
-//     }
-//     else
-//     {
-//         bsp_board_led_off(LEDBUTTON_LED);
-//         NRF_LOG_INFO("Received LED OFF!");
-//     }
-// }
-
-
 /**@brief Function for initializing services that will be used by the application.
  */
-static void services_init(void)
+static void ble_services_init(void)
 {
     // ret_code_t         err_code;
     nrf_ble_qwr_init_t qwr_init = {0};
@@ -308,6 +307,9 @@ static void services_init(void)
 
     nrf_ble_qwr_init(&m_qwr, &qwr_init);
     // APP_ERROR_CHECK(err_code);
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("BLE Services init");
+    #endif
 }
 
 
@@ -346,7 +348,7 @@ static void conn_params_error_handler(uint32_t nrf_error)
 
 /**@brief Function for initializing the Connection Parameters module.
  */
-static void conn_params_init(void)
+static void ble_connection_params_init(void)
 {
 
     ble_conn_params_init_t cp_init;
@@ -364,16 +366,22 @@ static void conn_params_init(void)
 
     ble_conn_params_init(&cp_init);
     // APP_ERROR_CHECK(err_code);
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    NRF_LOG_DEBUG("BLE connection paramters init");
+    #endif
 }
 
 
 /**@brief Function for starting advertising.
  */
-static void advertising_start(void)
+static void ble_advertising_start(void)
 {
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-    bsp_board_led_on(BSP_BOARD_LED_2);
+    bsp_board_led_on(ADVERTISING_LED);
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+    NRF_LOG_DEBUG("Advertising Init");
+    #endif
 }
 
 
@@ -389,9 +397,11 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            // NRF_LOG_INFO("Connected");
-            bsp_board_led_on(BSP_BOARD_LED_3);
-            bsp_board_led_off(BSP_BOARD_LED_2);
+            #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+            NRF_LOG_INFO("Connected");
+            #endif
+            bsp_board_led_on(CONNECTED_LED);
+            bsp_board_led_off(ADVERTISING_LED);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
             sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
           nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -400,12 +410,14 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            // NRF_LOG_INFO("Disconnected");
-            bsp_board_led_off(BSP_BOARD_LED_3);
+            #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+            NRF_LOG_INFO("Disconnected");
+            #endif
+            bsp_board_led_off(CONNECTED_LED);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             // err_code = app_button_disable();
             // APP_ERROR_CHECK(err_code);
-            advertising_start();
+            ble_advertising_start();
             break;
 
         // case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
@@ -563,17 +575,35 @@ static void log_init(void)
 //     }
 // }
 
+static void ble_stack_init(void)
+{
+    // Configure the BLE stack using the default settings.
+    // Fetch the start address of the application RAM.
+    uint32_t ram_start = 0;
+    nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
+
+    // Enable BLE stack.
+    nrf_sdh_ble_enable(&ram_start);
+
+    // Register a handler for BLE events.
+    NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
+
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_DEBUG("BLE Stack INIT");
+    #endif
+}
+
 
 /**@brief Function for application main entry.
  */
 
-void send_button(uint8_t button_state){
+void write_to_characteristic(uint8_t characteristic_value){
     ble_gatts_hvx_params_t params;
-    uint16_t len = sizeof(button_state);
+    uint16_t len = sizeof(characteristic_value);
     memset(&params, 0, sizeof(params));
     params.type = BLE_GATT_HVX_NOTIFICATION;
     params.handle = button_char_handles.value_handle;
-    params.p_data = &button_state;
+    params.p_data = &characteristic_value;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
@@ -587,9 +617,22 @@ static void button_handler(uint8_t pin, uint8_t action){
         {
             bsp_board_led_off(BSP_BOARD_LED_0);
         }
-        send_button(action);
+        write_to_characteristic(action);
         
     }
+}
+
+static void button_init(void)
+{
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_DEBUG("Button INIT");
+    #endif
+    nrf_sdh_enable_request();
+    static app_button_cfg_t buttons[] ={
+        {BSP_BUTTON_0, false, BUTTON_PULL, button_handler}
+    };
+    app_button_init(buttons, ARRAY_SIZE(buttons), APP_TIMER_TICKS(50));
+    app_button_enable();
 }
 
 
@@ -616,8 +659,8 @@ void saadc_sampling_event_init(void)
     err_code = nrf_drv_timer_init(&m_timer, &timer_cfg, timer_handler);
     APP_ERROR_CHECK(err_code);
 
-    /* setup m_timer for compare event every 400ms */
-    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer, 400);
+    /* setup m_timer for compare event every 1000ms */
+    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer, 1000);
 
     nrf_drv_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
@@ -658,13 +701,22 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
         APP_ERROR_CHECK(err_code);
 
         int i;
+        #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
         NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
-
+        #endif
+        double V;
+        uint8_t ADC_RESOLUTION = 12;
+        uint8_t ADC_SCALING = 3;
+        double ADC_REF_VOLTAGE = 3.6; //[V]
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
         {
-            NRF_LOG_INFO("ADC val %d", p_event->data.done.p_buffer[i]);
             // TODO: Eventually add a string here with all the data 
-            send_button(p_event->data.done.p_buffer[i]);
+            V = (((p_event->data.done.p_buffer[i] * ADC_REF_VOLTAGE) / (2^(ADC_RESOLUTION-1)) / ADC_SCALING));
+            #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+                NRF_LOG_INFO("ADC val %d", p_event->data.done.p_buffer[i]);
+                NRF_LOG_INFO("ADC Convertied Voltage [V] %f", V);
+            #endif
+            write_to_characteristic(p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
     }
@@ -675,7 +727,12 @@ void saadc_init(void)
     ret_code_t err_code;
     nrf_saadc_channel_config_t channel_config =
         NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN5);
-
+    //Configure SAADC
+    // nrf_drv_saadc_config_t saadc_config;
+    // saadc_config.low_power_mode = true;                                                   //Enable low power mode.
+    // saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 //Set SAADC resolution to 12-bit. This will make the SAADC output values from 0 (when input voltage is 0V) to 2^12=4096 (when input voltage is 3.6V for channel gain setting of 1/6).
+    // saadc_config.oversample = SAADC_OVERSAMPLE;                                           //Set oversample to 4x. This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times.
+    // saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;                               //Set SAADC interrupt to low priority.
     err_code = nrf_drv_saadc_init(NULL, saadc_callback);
     APP_ERROR_CHECK(err_code);
 
@@ -687,7 +744,9 @@ void saadc_init(void)
 
     err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER);
     APP_ERROR_CHECK(err_code);
-
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+        NRF_LOG_INFO("SAADC INIT");
+    #endif
 }
 
 
@@ -696,40 +755,25 @@ int main(void)
 {
     // Initialize.
     log_init();
-        NRF_LOG_INFO("Inniting crap");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+        NRF_LOG_INFO("Program Start");
+    #endif
     // power_management_init();
-    bsp_board_init(BSP_INIT_LEDS);
-    app_timer_init();
-    nrf_sdh_enable_request();
-    static app_button_cfg_t buttons[] ={
-        {BSP_BUTTON_0, false, BUTTON_PULL, button_handler}
-    };
-    app_button_init(buttons, ARRAY_SIZE(buttons), APP_TIMER_TICKS(50));
-    app_button_enable();
+    leds_init();
+    timers_init();
+    button_init();
 
-    // Configure the BLE stack using the default settings.
-    // Fetch the start address of the application RAM.
-    uint32_t ram_start = 0;
-    nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
+    ble_stack_init();
+    ble_gap_params_init();
+    ble_gatt_init();
+    ble_services_init();
+    ble_advertising_init();
+    ble_connection_params_init();
 
-    // Enable BLE stack.
-    nrf_sdh_ble_enable(&ram_start);
-
-    // Register a handler for BLE events.
-    NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
-
-
-    gap_params_init();
-    // gatt_init();
-    nrf_ble_gatt_init(&m_gatt, NULL);
-    services_init();
-    advertising_init();
-    conn_params_init();
     saadc_init();
     saadc_sampling_event_init();
     // Start execution.
-    NRF_LOG_INFO("Blinky example started.");
-    advertising_start();
+    ble_advertising_start();
 
     // Enter main loop.
     for (;;)
@@ -737,31 +781,6 @@ int main(void)
 
             NRF_LOG_PROCESS();
         // idle_state_handle();
-
-        // send_button(0x69);
-        // nrf_delay_us(3000);
-        // send_button(0x07);
         // nrf_delay_us(3000);        
     }
 }
-
-
-
-// // // Basic Button press
-
-// // #include "boards.h"
-
-// // int main(){
-// //     bsp_board_init(BSP_INIT_BUTTONS | BSP_INIT_LEDS);
-// //     while(1){
-// //         if(bsp_board_button_state_get(BSP_BUTTON_0)){
-// //             bsp_board_led_on(BSP_BOARD_LED_0);
-// //             bsp_board_led_off(BSP_BOARD_LED_1);
-// //         }
-// //         else{
-// //             bsp_board_led_off(BSP_BOARD_LED_0);
-// //             bsp_board_led_on(BSP_BOARD_LED_1);            
-// //         }
-// //     }
-// // }
-
