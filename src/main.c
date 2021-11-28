@@ -32,14 +32,14 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+
 #define SAMPLES_IN_BUFFER 1
-volatile uint8_t state = 1;
+#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
 static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
-#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
 
 typedef enum
@@ -47,8 +47,8 @@ typedef enum
     LOG_LEVEL_INFO  = 1,
     LOG_LEVEL_DEBUG = 2
 } log_level;
-
 #define LOG_LEVEL LOG_LEVEL_INFO
+
 
 
 // #define TX_POWER_LEVEL -8
@@ -91,9 +91,12 @@ typedef enum
 
 #define UUID_BASE {0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00}
 #define UUID_SERVICE 0x1234
-#define UUID_BUTTON_CHAR 0x1234
+#define UUID_VOLTAGE_CHAR 0x1234
+#define UUID_TEMPERATURE_1_CHAR 0x3456
+#define UUID_TEMPERATURE_2_CHAR 0x5678
 
-// BLE_LBS_DEF(m_lbs);                                                             /**< LED Button Service instance. */
+
+
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 
@@ -101,7 +104,12 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
 static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];         /**< Buffer for storing an encoded scan data. */
-ble_gatts_char_handles_t button_char_handles;
+
+ble_gatts_char_handles_t voltage_char_handles;                                   /** Voltage Sensor Characteristic */
+ble_gatts_char_handles_t temperature_1_char_handles;                             /** Temperature Sensor 1 Characteristic */
+ble_gatts_char_handles_t temperature_2_char_handles;                             /** Temperature Sensor 2 Characteristic */
+
+
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -135,7 +143,7 @@ static ble_gap_adv_data_t m_adv_data =
 //     app_error_handler(DEAD_BEEF, line_num, p_file_name);
 // }
 
-/*\
+/*
 Descripttion : Sets up all the the LEDs used by the program
 */
 static void leds_init(void)
@@ -226,18 +234,26 @@ static void ble_advertising_init(void)
     sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &ble_uuid, &service_handle);
 
 
-    // Add the button characteristic
+    // Setup characteristic paramters
 
     memset(&add_char_params, 0 , sizeof(add_char_params));
-    add_char_params.uuid = UUID_BUTTON_CHAR;
     add_char_params.uuid_type = uuid_type;
-    add_char_params.init_len = sizeof(uint8_t);
-    add_char_params.max_len = sizeof(uint8_t);
+    add_char_params.init_len = sizeof(uint16_t);
+    add_char_params.max_len = sizeof(uint16_t);
     add_char_params.char_props.read = 1;
     add_char_params.char_props.notify = 1;
     add_char_params.read_access = SEC_OPEN;
     add_char_params.cccd_write_access = SEC_OPEN;
-    characteristic_add(service_handle, &add_char_params, &button_char_handles);
+
+    add_char_params.uuid = UUID_VOLTAGE_CHAR;
+    characteristic_add(service_handle, &add_char_params, &voltage_char_handles);         //Setup voltage characteristic
+
+    add_char_params.uuid = UUID_TEMPERATURE_1_CHAR;
+    characteristic_add(service_handle, &add_char_params, &temperature_1_char_handles);   //Setup_temperature characteristic
+
+    add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
+    characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles);   //Setup_temperature characteristic
+
 
 
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
@@ -470,111 +486,6 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 }
 
 
-/**@brief Function for initializing the BLE stack.
- *
- * @details Initializes the SoftDevice and the BLE event interrupt.
- */
-// static void ble_stack_init(void)
-// {
-//     ret_code_t err_code;
-
-//     err_code = nrf_sdh_enable_request();
-//     APP_ERROR_CHECK(err_code);
-
-//     // Configure the BLE stack using the default settings.
-//     // Fetch the start address of the application RAM.
-//     uint32_t ram_start = 0;
-//     err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
-//     APP_ERROR_CHECK(err_code);
-
-//     // Enable BLE stack.
-//     err_code = nrf_sdh_ble_enable(&ram_start);
-//     APP_ERROR_CHECK(err_code);
-
-//     // Register a handler for BLE events.
-//     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
-// }
-
-
-// /**@brief Function for handling events from the button handler module.
-//  *
-//  * @param[in] pin_no        The pin that the event applies to.
-//  * @param[in] button_action The button action (press/release).
-//  */
-// static void button_event_handler(uint8_t pin_no, uint8_t button_action)
-// {
-//     ret_code_t err_code;
-
-//     switch (pin_no)
-//     {
-//         case LEDBUTTON_BUTTON:
-//             NRF_LOG_INFO("Send button state change.");
-//             err_code = ble_lbs_on_button_change(m_conn_handle, &m_lbs, button_action);
-//             if (err_code != NRF_SUCCESS &&
-//                 err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-//                 err_code != NRF_ERROR_INVALID_STATE &&
-//                 err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-//             {
-//                 APP_ERROR_CHECK(err_code);
-//             }
-//             break;
-
-//         default:
-//             APP_ERROR_HANDLER(pin_no);
-//             break;
-//     }
-// }
-
-
-// /**@brief Function for initializing the button handler module.
-//  */
-// static void buttons_init(void)
-// {
-//     ret_code_t err_code;
-
-//     //The array must be static because a pointer to it will be saved in the button handler module.
-//     static app_button_cfg_t buttons[] =
-//     {
-//         {LEDBUTTON_BUTTON, false, BUTTON_PULL, button_event_handler}
-//     };
-
-//     err_code = app_button_init(buttons, ARRAY_SIZE(buttons),
-//                                BUTTON_DETECTION_DELAY);
-//     APP_ERROR_CHECK(err_code);
-// }
-
-
-static void log_init(void)
-{
-    ret_code_t err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-}
-
-
-// /**@brief Function for initializing power management.
-//  */
-// static void power_management_init(void)
-// {
-//     ret_code_t err_code;
-//     err_code = nrf_pwr_mgmt_init();
-//     APP_ERROR_CHECK(err_code);
-// }
-
-
-// /**@brief Function for handling the idle state (main loop).
-//  *
-//  * @details If there is no pending log operation, then sleep until next the next event occurs.
-//  */
-// static void idle_state_handle(void)
-// {
-//     if (NRF_LOG_PROCESS() == false)
-//     {
-//         nrf_pwr_mgmt_run();
-//     }
-// }
-
 static void ble_stack_init(void)
 {
     // Configure the BLE stack using the default settings.
@@ -594,21 +505,22 @@ static void ble_stack_init(void)
 }
 
 
-/**@brief Function for application main entry.
- */
 
-void write_to_characteristic(uint8_t characteristic_value){
+
+void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_handles_t char_handle)
+{
     ble_gatts_hvx_params_t params;
     uint16_t len = sizeof(characteristic_value);
     memset(&params, 0, sizeof(params));
     params.type = BLE_GATT_HVX_NOTIFICATION;
-    params.handle = button_char_handles.value_handle;
+    params.handle = char_handle.value_handle;
     params.p_data = &characteristic_value;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
 
-static void button_handler(uint8_t pin, uint8_t action){
+static void button_handler(uint8_t pin, uint8_t action)
+{
     if(pin == BSP_BUTTON_0){
         if(action == APP_BUTTON_PUSH){
             bsp_board_led_on(BSP_BOARD_LED_0);
@@ -617,7 +529,7 @@ static void button_handler(uint8_t pin, uint8_t action){
         {
             bsp_board_led_off(BSP_BOARD_LED_0);
         }
-        write_to_characteristic(action);
+        ble_write_to_characteristic(action, voltage_char_handles);
         
     }
 }
@@ -683,6 +595,8 @@ void saadc_sampling_event_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+/**@brief Function enabling the PPI(programmable peripheral interconnect) peripheral to allow the SAADC to sample faster
+ */
 void saadc_sampling_event_enable(void)
 {
     ret_code_t err_code = nrf_drv_ppi_channel_enable(m_ppi_channel);
@@ -690,7 +604,10 @@ void saadc_sampling_event_enable(void)
     APP_ERROR_CHECK(err_code);
 }
 
-
+/**@brief Function for setting up the SAADC callback function
+ * 
+ * @params p_event Event descriptor for the SAADC event
+ */
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
     if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
@@ -716,12 +633,14 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
                 NRF_LOG_INFO("ADC val %d", p_event->data.done.p_buffer[i]);
                 NRF_LOG_INFO("ADC Convertied Voltage [V] %f", V);
             #endif
-            write_to_characteristic(p_event->data.done.p_buffer[i]);
+            ble_write_to_characteristic(p_event->data.done.p_buffer[i], voltage_char_handles);
         }
         m_adc_evt_counter++;
     }
 }
 
+/**@brief Function for setting up the SAADC peripheral.
+ */
 void saadc_init(void)
 {
     ret_code_t err_code;
@@ -749,8 +668,41 @@ void saadc_init(void)
     #endif
 }
 
+/**@brief Function for setting up logs.
+ */
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+}
 
 
+// /**@brief Function for initializing power management.
+//  */
+// static void power_management_init(void)
+// {
+//     ret_code_t err_code;
+//     err_code = nrf_pwr_mgmt_init();
+//     APP_ERROR_CHECK(err_code);
+// }
+
+
+// /**@brief Function for handling the idle state (main loop).
+//  *
+//  * @details If there is no pending log operation, then sleep until next the next event occurs.
+//  */
+// static void idle_state_handle(void)
+// {
+//     if (NRF_LOG_PROCESS() == false)
+//     {
+//         nrf_pwr_mgmt_run();
+//     }
+// }
+
+/**@brief Function for application main entry.
+ */
 int main(void)
 {
     // Initialize.
