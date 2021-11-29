@@ -485,7 +485,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     }
 }
 
-
+/**@brief Function which inits the BLE stack(enables the stack, sets up the observer)
+ */
 static void ble_stack_init(void)
 {
     // Configure the BLE stack using the default settings.
@@ -506,7 +507,11 @@ static void ble_stack_init(void)
 
 
 
-
+/**@brief Function which writes a value to the characteristic mentioned
+ * 
+ * @param  characteristic_value [in] Value being written to the characteristic
+ * @param char_handle [in] handle of the characteristic
+ */
 void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_handles_t char_handle)
 {
     ble_gatts_hvx_params_t params;
@@ -519,6 +524,11 @@ void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_ha
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
 
+/**@brief Funtion for the button handler that uses interrupts to check if a button has been pushed
+ * 
+ * @param pin [in] variable which holds the button which the handler is handling
+ * @param action [in] variable which stores the action which the button is doing.
+ */
 static void button_handler(uint8_t pin, uint8_t action)
 {
     if(pin == BSP_BUTTON_0){
@@ -534,6 +544,8 @@ static void button_handler(uint8_t pin, uint8_t action)
     }
 }
 
+/**@brief Function initializing the button and the soft device interrupt handler
+ */
 static void button_init(void)
 {
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
@@ -547,8 +559,9 @@ static void button_init(void)
     app_button_enable();
 }
 
-
-void timer_handler(nrf_timer_event_t event_type, void * p_context)
+/**@brief Function collecting a sample from the GPIO pins
+ */
+void saadc_timer_handler(nrf_timer_event_t event_type, void * p_context)
 {
     // NRF_LOG_INFO("Timer interrupt");
     
@@ -559,6 +572,8 @@ void timer_handler(nrf_timer_event_t event_type, void * p_context)
     */
 }
 
+/**@brief Function to setup how frequently sampling should be done
+ */
 void saadc_sampling_event_init(void)
 {
     ret_code_t err_code;
@@ -568,7 +583,7 @@ void saadc_sampling_event_init(void)
 
     nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
-    err_code = nrf_drv_timer_init(&m_timer, &timer_cfg, timer_handler);
+    err_code = nrf_drv_timer_init(&m_timer, &timer_cfg, saadc_timer_handler);
     APP_ERROR_CHECK(err_code);
 
     /* setup m_timer for compare event every 1000ms */
@@ -595,7 +610,7 @@ void saadc_sampling_event_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
-/**@brief Function enabling the PPI(programmable peripheral interconnect) peripheral to allow the SAADC to sample faster
+/**@brief Function enabling the PPI(programmable peripheral interconnect) peripheral to allow the SAADC to sample without intervention from the CPU
  */
 void saadc_sampling_event_enable(void)
 {
@@ -606,7 +621,7 @@ void saadc_sampling_event_enable(void)
 
 /**@brief Function for setting up the SAADC callback function
  * 
- * @params p_event Event descriptor for the SAADC event
+ * param p_event Event descriptor for the SAADC event
  */
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
