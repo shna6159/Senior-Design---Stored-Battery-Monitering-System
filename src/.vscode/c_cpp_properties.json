@@ -1,15 +1,14 @@
 {
     "configurations": [
         {
-            "name": "pca10040/s132",
+            "name": "pca10059/s140",
             "includePath": [
                 "${workspaceFolder}/pca10056/config",
                 "${workspaceFolder}/pca10059/config",
-                "${workspaceFolder}/SDK",
+                "${workspaceFolder}/SDK/**",
                 "${workspaceFolder}/SDK/components/libraries/util",
                 "${workspaceFolder}/SDK/modules/nrfx/mdk",
                 "${workspaceFolder}/SDK/components/drivers_nrf/nrf_soc_nosd",
-                "${workspaceFolder}/SDK/components/softdevice/s112/headers",
                 "${workspaceFolder}/SDK/components/ble/ble_services/ble_lbs",
                 "${workspaceFolder}/SDK/components/ble/common",
                 "${workspaceFolder}/SDK/components/softdevice/common",
@@ -27,7 +26,8 @@
                 "${workspaceFolder}/SDK/components/libraries/log/src",
                 "${workspaceFolder}/SDK/components/libraries/strerror",
                 "${workspaceFolder}/SDK/components/libraries/memobj",
-                "${workspaceFolder}/SDK/components/libraries/balloc"
+                "${workspaceFolder}/SDK/components/libraries/balloc",
+                "${workspaceFolder}/SDK/components/libraries/timer"
             ],
             // "defines": [
             //     "BOARD_PCA10040",
@@ -44,16 +44,19 @@
             "compilerPath": "C:/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin/arm-none-eabi-gcc.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64"
+            "intelliSenseMode": "clang-x64",
+            "configurationProvider": "nrf-connect"
         },
         {
             "name": "pca10056/s140",
             "includePath": [
                 "${workspaceFolder}/pca10056/config",
-                "${workspaceFolder}/pca10059/config"
+                "${workspaceFolder}/pca10059/config",
+                "${workspaceFolder}/SDK/**"
             ],
             "defines": [
                 "BOARD_PCA10056",
+                "BOARD_PCA10059",
                 "CONFIG_GPIO_AS_PINRESET",
                 "FLOAT_ABI_HARD",
                 "NRF52840_XXAA",
@@ -65,7 +68,7 @@
             "compilerPath": "C:/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin/arm-none-eabi-gcc.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64"
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4
