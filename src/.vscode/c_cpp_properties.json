@@ -50,8 +50,10 @@
         {
             "name": "pca10056/s140",
             "includePath": [
-                "${workspaceFolder}/pca10056/config",
-                "${workspaceFolder}/pca10059/config",
+                "${workspaceFolder}/code_on_site/pca10056/config",
+                "${workspaceFolder}/code_on_site/pca10059/config",
+                "${workspaceFolder}/code_in_box/pca10056/config",
+                "${workspaceFolder}/code_in_box/pca10059/config",
                 "${workspaceFolder}/SDK/**"
             ],
             "defines": [
