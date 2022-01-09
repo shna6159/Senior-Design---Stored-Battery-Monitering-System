@@ -1,0 +1,1 @@
+// All the code for the BLE communication goes here

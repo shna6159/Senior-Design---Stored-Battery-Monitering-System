@@ -50,11 +50,6 @@ typedef enum
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 
-
-// #define TX_POWER_LEVEL -8
-// #define TX_POWER_LEVEL -4
-// #define TX_POWER_LEVEL 0
-// #define TX_POWER_LEVEL 4
 #define TX_POWER_LEVEL 8
 
 #define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
