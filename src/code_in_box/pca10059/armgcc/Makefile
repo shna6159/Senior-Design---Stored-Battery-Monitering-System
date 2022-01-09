@@ -67,9 +67,6 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_saadc.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_soc.c \
-  $(PROJ_DIR)/in_box_ble.c \
-  $(PROJ_DIR)/in_box_config.c \
-  $(PROJ_DIR)/in_box_saadc.c \
   $(PROJ_DIR)/in_box_main.c \
   
   
