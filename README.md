@@ -12,9 +12,12 @@
 * To delete the build folder, run make clean.
 * To flash the code, open the NRFconnect app and open the programmer. Select the hex file from the _build folder. Also select the soft device hex file from the soft device folder
 * Select the write command to write these commands to the board
+* Use the make command and the make flash command to flash the board using the make file(the make flash command is applicable only to the dev kit)
 
 
 To run the BLE signal strength tool
 * Install Python 3.7.9[That specific version]
 * Install the python library called Blatann
+* Flash the board with the connectivity hex file in the folder
+* Run the python script in command prompt.
 
