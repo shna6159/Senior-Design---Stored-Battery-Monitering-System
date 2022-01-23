@@ -52,6 +52,8 @@
 #include "boards.h"
 #include "app_error.h"
 #include "nrf_delay.h"
+#include "nrf_gpio.h"
+#include "nrf_drv_gpiote.h"
 
 #define TIMEOUT_VALUE                    50000                          /**< 50 mseconds timer time-out value. */
 #define TOGGLE_LED_COUNTER               (500 / (TIMEOUT_VALUE / 1000)) /**< Interval for toggling a LED. Yields to 500 mseconds. */

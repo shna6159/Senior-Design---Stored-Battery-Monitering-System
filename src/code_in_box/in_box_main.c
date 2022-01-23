@@ -32,6 +32,11 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+#include "nrf_gpio.h"
+#include "nrf_drv_gpiote.h"
+#define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0,11)
+#define output_pin NRF_GPIO_PIN_MAP(0,17)
+
 #define SAMPLES_IN_BUFFER 1
 #define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
@@ -633,7 +638,7 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
         double V;
         uint8_t ADC_RESOLUTION = 12;
         uint8_t ADC_SCALING = 3;
-        double ADC_REF_VOLTAGE = 3.6; //[V]
+        double ADC_REF_VOLTAGE = 3.3; //[V]
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
         {
             // TODO: Eventually add a string here with all the data 
@@ -675,6 +680,7 @@ void saadc_init(void)
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
         NRF_LOG_INFO("SAADC INIT");
     #endif
+    // nrf_drv_saadc_calibrate_offset();
 }
 
 /**@brief Function for setting up logs.
@@ -710,6 +716,123 @@ static void log_init(void)
 //     }
 // }
 
+
+
+static void timer_init()
+{
+	NRF_TIMER1->TASKS_STOP = 1;
+	NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
+	NRF_TIMER1->PRESCALER = 1;	// Fhck / 2^8 
+	NRF_TIMER1->CC[0] = 62500;	// 62500 - 1s
+	
+	NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);	
+	
+	NRF_TIMER1->TASKS_CLEAR = 1;
+	NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+	
+	NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+    NRF_LOG_INFO("Timer1 setup");
+    nrf_gpio_pin_set(output_pin);
+}
+static void counter_init()
+{
+	NRF_TIMER2->TASKS_STOP = 1;	
+	NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
+	NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+	NRF_TIMER2->TASKS_CLEAR = 1;
+	NRF_TIMER2->EVENTS_COMPARE[0] = 0;
+    NRF_LOG_INFO("Timer2 setup");
+
+    NRF_TIMER3->TASKS_STOP = 1;	
+	NRF_TIMER3->MODE = TIMER_MODE_MODE_Counter;
+	NRF_TIMER3->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+	NRF_TIMER3->TASKS_CLEAR = 1;
+	NRF_TIMER3->EVENTS_COMPARE[0] = 0;
+    NRF_LOG_INFO("Timer3 setup");
+}
+static void gpiote_init_rising(uint32_t pin)
+{
+	NRF_GPIOTE->CONFIG[0] 	= 	0x01 << 0; 								// MODE: Event
+	NRF_GPIOTE->CONFIG[0] 	|= 	pin << 8;								// Pin number
+	NRF_GPIOTE->CONFIG[0] 	|= 	NRF_GPIOTE_POLARITY_LOTOHI	<< 16;		// Event rising edge 
+    NRF_LOG_INFO("gpiote_init rising edge");	
+
+}
+static void gpiote_init_falling(uint32_t pin)
+{
+    NRF_GPIOTE->CONFIG[1] 	= 	0x01 << 0; 								// MODE: Event
+	NRF_GPIOTE->CONFIG[1] 	|= 	pin << 8;								// Pin number
+	NRF_GPIOTE->CONFIG[1] 	|= 	NRF_GPIOTE_POLARITY_HITOLO	<< 16;		// Event rising edge
+    NRF_LOG_INFO("gpiote_init_falling edge");
+}
+
+static void ppi_timer_stop_counter_init()
+{
+	NRF_PPI->CHEN |= 1 << 0;
+	*(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+	*(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
+    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER3->TASKS_STOP;
+	NRF_PPI->CHENSET |= 1 << 0;
+    NRF_LOG_INFO("ppi_timer_stop_counter_init");
+}
+
+static void ppi_gpiote_counter_init()
+{
+	NRF_PPI->CHEN |= 1 << 1;
+	*(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
+	*(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
+    *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
+	NRF_PPI->CHENSET |= 1 << 1;
+    NRF_LOG_INFO("ppi_gpiote_counter_init");
+}
+
+static void ppi_gpiote_counter_init_timer3()
+{
+	NRF_PPI->CHEN |= 1 << 2;
+	*(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
+	*(&(NRF_PPI->CH2_TEP)) = (uint32_t)&NRF_TIMER3->TASKS_COUNT;
+    *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[3];
+	NRF_PPI->CHENSET |= 1 << 2;
+    NRF_LOG_INFO("ppi_gpiote_counter_init_timer3");
+}
+void TIMER1_IRQHandler(void) 
+{
+    NRF_LOG_INFO("timer_irq1 handler");
+	if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
+	{
+        nrf_gpio_pin_toggle(output_pin);
+		NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+		NRF_TIMER2->TASKS_CAPTURE[0] = 1;
+        NRF_TIMER3->TASKS_CAPTURE[0] = 1;
+        // NRF_PPI->CH[0].EEP = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
+        // NRF_PPI->CH[0].TEP = (uint32_t)&NRF_TIMER3->TASKS_CAPTURE[1];
+				
+		NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
+        NRF_LOG_INFO("num falling edges: %d", NRF_TIMER3->CC[0]);
+        NRF_LOG_INFO("Timer 1 -> rising edge tick: %d", NRF_TIMER1->CC[2]);
+        NRF_LOG_INFO("Timer 1 -> falling edge tick: %d", NRF_TIMER1->CC[3]);
+
+
+
+		// NRF_TIMER1->TASKS_CLEAR = 1;
+		// NRF_TIMER2->TASKS_CLEAR = 1;
+        // NRF_TIMER3->TASKS_CLEAR = 1;
+
+		NRF_TIMER1->TASKS_STOP = 1;
+		NRF_TIMER2->TASKS_STOP = 1;      
+        NRF_TIMER3->TASKS_STOP = 1;
+  
+						
+		NRF_TIMER1->TASKS_CLEAR = 1;
+		NRF_TIMER2->TASKS_CLEAR = 1;
+        NRF_TIMER3->TASKS_CLEAR = 1;
+
+        NRF_TIMER2->TASKS_START = 1;	
+        NRF_TIMER3->TASKS_START = 1;	
+
+    }
+}
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -717,7 +840,7 @@ int main(void)
     // Initialize.
     log_init();
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-        NRF_LOG_INFO("Program Start");
+        NRF_LOG_INFO("Program Start shit the fan!!!!!");
     #endif
     // power_management_init();
     leds_init();
@@ -731,8 +854,26 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
-    saadc_init();
-    saadc_sampling_event_init();
+    NVIC_EnableIRQ(TIMER1_IRQn);
+    NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
+    nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
+    nrf_gpio_cfg_output(output_pin);
+    timer_init();
+    counter_init();
+    gpiote_init_rising(FREQ_MEASURE_PIN);
+    gpiote_init_falling(FREQ_MEASURE_PIN);
+	ppi_gpiote_counter_init();
+    ppi_gpiote_counter_init_timer3();
+	ppi_timer_stop_counter_init();
+
+    NRF_TIMER1->TASKS_START = 1;
+	NRF_TIMER2->TASKS_START = 1;
+    NRF_TIMER3->TASKS_START = 1;
+    NRF_LOG_INFO("Everything inited!!!!!");
+    nrf_gpio_pin_set(output_pin);
+    // saadc_init();
+    // saadc_sampling_event_init();
+    
     // Start execution.
     ble_advertising_start();
 
