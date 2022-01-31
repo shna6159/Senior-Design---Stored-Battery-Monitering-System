@@ -40,7 +40,7 @@
 #define SAMPLES_IN_BUFFER 1
 #define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
-static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
+static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(3);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
@@ -878,11 +878,10 @@ int main(void)
 
     NRF_TIMER1->TASKS_START = 1;
 	NRF_TIMER2->TASKS_START = 1;
-    // NRF_TIMER3->TASKS_START = 1;
     NRF_LOG_INFO("Everything inited!!!!!");
     
-    // saadc_init();
-    // saadc_sampling_event_init();
+    saadc_init();
+    saadc_sampling_event_init();
     
     // Start execution.
     ble_advertising_start();
@@ -892,6 +891,7 @@ int main(void)
     {
             NRF_LOG_PROCESS();
         // idle_state_handle();
-        // nrf_delay_us(3000);        
+        // nrf_delay_us(3000);  
+              
     }
 }
