@@ -35,7 +35,7 @@
 #include "nrf_gpio.h"
 #include "nrf_drv_gpiote.h"
 #define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0,11)
-#define output_pin NRF_GPIO_PIN_MAP(0,17)
+#define output_pin NRF_GPIO_PIN_MAP(0,12)
 
 #define SAMPLES_IN_BUFFER 1
 #define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
@@ -46,12 +46,11 @@ static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
 
 
-typedef enum
-{
-    LOG_LEVEL_INFO  = 1,
-    LOG_LEVEL_DEBUG = 2
+typedef enum{
+    LOG_LEVEL_INFO = 0,
+    LOG_LEVEL_DEBUG
 } log_level;
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 
 
 #define TX_POWER_LEVEL 8
@@ -147,8 +146,8 @@ Descripttion : Sets up all the the LEDs used by the program
 */
 static void leds_init(void)
 {
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("LED init");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == 1
+        NRF_LOG_INFO("LED init");
     #endif
     bsp_board_init(BSP_INIT_LEDS);
 
@@ -163,7 +162,7 @@ static void timers_init(void)
 {
     // Initialize timer module, making it use the scheduler
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("TIMER init");
+        NRF_LOG_INFO("TIMER init");
     #endif
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
@@ -197,7 +196,7 @@ static void ble_gap_params_init(void)
 
     sd_ble_gap_ppcp_set(&gap_conn_params);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("GAP init");
+    NRF_LOG_INFO("GAP init");
     #endif
 }
 
@@ -207,7 +206,7 @@ static void ble_gap_params_init(void)
 static void ble_gatt_init(void)
 {
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("GATT init");
+    NRF_LOG_INFO("GATT init");
     #endif
     ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, NULL);
     APP_ERROR_CHECK(err_code);
@@ -292,7 +291,7 @@ static void ble_advertising_init(void)
 
      sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("Advertising init");
+    NRF_LOG_INFO("Advertising init");
     #endif
 }
 
@@ -323,7 +322,7 @@ static void ble_services_init(void)
     nrf_ble_qwr_init(&m_qwr, &qwr_init);
     // APP_ERROR_CHECK(err_code);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("BLE Services init");
+    NRF_LOG_INFO("BLE Services init");
     #endif
 }
 
@@ -382,7 +381,7 @@ static void ble_connection_params_init(void)
     ble_conn_params_init(&cp_init);
     // APP_ERROR_CHECK(err_code);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("BLE connection paramters init");
+        NRF_LOG_INFO("BLE connection paramters init");
     #endif
 }
 
@@ -395,7 +394,7 @@ static void ble_advertising_start(void)
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-    NRF_LOG_DEBUG("Advertising Init");
+        NRF_LOG_INFO("Advertising Init");
     #endif
 }
 
@@ -446,7 +445,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
         // {
-        //     NRF_LOG_DEBUG("PHY update request.");
+        //     NRF_LOG_INFO("PHY update request.");
         //     ble_gap_phys_t const phys =
         //     {
         //         .rx_phys = BLE_GAP_PHY_AUTO,
@@ -464,7 +463,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GATTC_EVT_TIMEOUT:
         //     // Disconnect on GATT Client timeout event.
-        //     NRF_LOG_DEBUG("GATT Client Timeout.");
+        //     NRF_LOG_INFO("GATT Client Timeout.");
         //     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
         //                                      BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         //     APP_ERROR_CHECK(err_code);
@@ -472,7 +471,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GATTS_EVT_TIMEOUT:
         //     // Disconnect on GATT Server timeout event.
-        //     NRF_LOG_DEBUG("GATT Server Timeout.");
+        //     NRF_LOG_INFO("GATT Server Timeout.");
         //     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
         //                                      BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         //     APP_ERROR_CHECK(err_code);
@@ -500,7 +499,7 @@ static void ble_stack_init(void)
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
 
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-        NRF_LOG_DEBUG("BLE Stack INIT");
+        NRF_LOG_INFO("BLE Stack INIT");
     #endif
 }
 
@@ -548,7 +547,7 @@ static void button_handler(uint8_t pin, uint8_t action)
 static void button_init(void)
 {
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-        NRF_LOG_DEBUG("Button INIT");
+        NRF_LOG_INFO("Button INIT");
     #endif
     nrf_sdh_enable_request();
     static app_button_cfg_t buttons[] ={
@@ -636,6 +635,7 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
         NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
         #endif
         double V;
+        UNUSED_VARIABLE(V);
         uint8_t ADC_RESOLUTION = 12;
         uint8_t ADC_SCALING = 3;
         double ADC_REF_VOLTAGE = 3.3; //[V]
@@ -680,7 +680,7 @@ void saadc_init(void)
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
         NRF_LOG_INFO("SAADC INIT");
     #endif
-    // nrf_drv_saadc_calibrate_offset();
+    nrf_drv_saadc_calibrate_offset();
 }
 
 /**@brief Function for setting up logs.
@@ -722,8 +722,8 @@ static void timer_init()
 {
 	NRF_TIMER1->TASKS_STOP = 1;
 	NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-	NRF_TIMER1->PRESCALER = 1;	// Fhck / 2^8 
-	NRF_TIMER1->CC[0] = 62500;	// 62500 - 1s
+	NRF_TIMER1->PRESCALER = 0;	// Fhck / 2^8 
+	NRF_TIMER1->CC[0] = 16000000;	// approx - 1s
 	
 	NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);	
 	
@@ -731,8 +731,10 @@ static void timer_init()
 	NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
 	
 	NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
     NRF_LOG_INFO("Timer1 setup");
-    nrf_gpio_pin_set(output_pin);
+    #endif
+    // nrf_gpio_pin_set(output_pin);
 }
 static void counter_init()
 {
@@ -741,21 +743,25 @@ static void counter_init()
 	NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
 	NRF_TIMER2->TASKS_CLEAR = 1;
 	NRF_TIMER2->EVENTS_COMPARE[0] = 0;
-    NRF_LOG_INFO("Timer2 setup");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("Timer2 setup");
+    #endif
 
-    NRF_TIMER3->TASKS_STOP = 1;	
-	NRF_TIMER3->MODE = TIMER_MODE_MODE_Counter;
-	NRF_TIMER3->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
-	NRF_TIMER3->TASKS_CLEAR = 1;
-	NRF_TIMER3->EVENTS_COMPARE[0] = 0;
-    NRF_LOG_INFO("Timer3 setup");
+    // NRF_TIMER3->TASKS_STOP = 1;	
+	// NRF_TIMER3->MODE = TIMER_MODE_MODE_Counter;
+	// NRF_TIMER3->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+	// NRF_TIMER3->TASKS_CLEAR = 1;
+	// NRF_TIMER3->EVENTS_COMPARE[0] = 0;
+    // NRF_LOG_INFO("Timer3 setup");
 }
 static void gpiote_init_rising(uint32_t pin)
 {
 	NRF_GPIOTE->CONFIG[0] 	= 	0x01 << 0; 								// MODE: Event
 	NRF_GPIOTE->CONFIG[0] 	|= 	pin << 8;								// Pin number
-	NRF_GPIOTE->CONFIG[0] 	|= 	NRF_GPIOTE_POLARITY_LOTOHI	<< 16;		// Event rising edge 
-    NRF_LOG_INFO("gpiote_init rising edge");	
+	NRF_GPIOTE->CONFIG[0] 	|= 	NRF_GPIOTE_POLARITY_LOTOHI	<< 16;		// Event rising edge
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("gpiote_init rising edge");
+    #endif
 
 }
 static void gpiote_init_falling(uint32_t pin)
@@ -763,7 +769,9 @@ static void gpiote_init_falling(uint32_t pin)
     NRF_GPIOTE->CONFIG[1] 	= 	0x01 << 0; 								// MODE: Event
 	NRF_GPIOTE->CONFIG[1] 	|= 	pin << 8;								// Pin number
 	NRF_GPIOTE->CONFIG[1] 	|= 	NRF_GPIOTE_POLARITY_HITOLO	<< 16;		// Event rising edge
-    NRF_LOG_INFO("gpiote_init_falling edge");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("gpiote_init_falling edge");
+    #endif
 }
 
 static void ppi_timer_stop_counter_init()
@@ -771,64 +779,66 @@ static void ppi_timer_stop_counter_init()
 	NRF_PPI->CHEN |= 1 << 0;
 	*(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
 	*(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
-    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER3->TASKS_STOP;
 	NRF_PPI->CHENSET |= 1 << 0;
-    NRF_LOG_INFO("ppi_timer_stop_counter_init");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("ppi_timer_stop_counter_init");
+    #endif
 }
 
-static void ppi_gpiote_counter_init()
+static void ppi_gpiote_counter_init_rising()
 {
 	NRF_PPI->CHEN |= 1 << 1;
 	*(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
 	*(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
     *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
 	NRF_PPI->CHENSET |= 1 << 1;
-    NRF_LOG_INFO("ppi_gpiote_counter_init");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("ppi_gpiote_counter_init_rising");
+    #endif
 }
 
-static void ppi_gpiote_counter_init_timer3()
+static void ppi_gpiote_counter_init_falling()
 {
 	NRF_PPI->CHEN |= 1 << 2;
 	*(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
-	*(&(NRF_PPI->CH2_TEP)) = (uint32_t)&NRF_TIMER3->TASKS_COUNT;
     *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[3];
 	NRF_PPI->CHENSET |= 1 << 2;
-    NRF_LOG_INFO("ppi_gpiote_counter_init_timer3");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+        NRF_LOG_INFO("ppi_gpiote_counter_init_timer3");
+    #endif
 }
 void TIMER1_IRQHandler(void) 
 {
-    NRF_LOG_INFO("timer_irq1 handler");
+    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+        NRF_LOG_INFO("timer_irq1 handler");
+    #endif
 	if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
 	{
         nrf_gpio_pin_toggle(output_pin);
 		NRF_TIMER1->EVENTS_COMPARE[0] = 0;
 		NRF_TIMER2->TASKS_CAPTURE[0] = 1;
-        NRF_TIMER3->TASKS_CAPTURE[0] = 1;
-        // NRF_PPI->CH[0].EEP = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
-        // NRF_PPI->CH[0].TEP = (uint32_t)&NRF_TIMER3->TASKS_CAPTURE[1];
-				
-		NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
-        NRF_LOG_INFO("num falling edges: %d", NRF_TIMER3->CC[0]);
-        NRF_LOG_INFO("Timer 1 -> rising edge tick: %d", NRF_TIMER1->CC[2]);
-        NRF_LOG_INFO("Timer 1 -> falling edge tick: %d", NRF_TIMER1->CC[3]);
-
-
-
-		// NRF_TIMER1->TASKS_CLEAR = 1;
-		// NRF_TIMER2->TASKS_CLEAR = 1;
-        // NRF_TIMER3->TASKS_CLEAR = 1;
+        
+        #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+            NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
+            // NRF_LOG_INFO("num falling edges: %d", NRF_TIMER3->CC[0]);
+            NRF_LOG_INFO("Timer 1 -> rising edge tick: %d", NRF_TIMER1->CC[2]);
+            NRF_LOG_INFO("Timer 1 -> falling edge tick: %d", NRF_TIMER1->CC[3]);
+            NRF_LOG_INFO("Pulse width: %d ns", NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2]);
+            // NRF_LOG_INFO("Temperature: %f [deg]", );
+            // double DC=NRF_TIMER2->CC[0]*(NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2])/16000000;
+            float DC = 22/7;
+            NRF_LOG_ERROR( "DC " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(DC));
+        #endif
+        
 
 		NRF_TIMER1->TASKS_STOP = 1;
 		NRF_TIMER2->TASKS_STOP = 1;      
-        NRF_TIMER3->TASKS_STOP = 1;
   
 						
 		NRF_TIMER1->TASKS_CLEAR = 1;
 		NRF_TIMER2->TASKS_CLEAR = 1;
-        NRF_TIMER3->TASKS_CLEAR = 1;
 
         NRF_TIMER2->TASKS_START = 1;	
-        NRF_TIMER3->TASKS_START = 1;	
 
     }
 }
@@ -862,15 +872,15 @@ int main(void)
     counter_init();
     gpiote_init_rising(FREQ_MEASURE_PIN);
     gpiote_init_falling(FREQ_MEASURE_PIN);
-	ppi_gpiote_counter_init();
-    ppi_gpiote_counter_init_timer3();
+	ppi_gpiote_counter_init_rising();
+    ppi_gpiote_counter_init_falling();
 	ppi_timer_stop_counter_init();
 
     NRF_TIMER1->TASKS_START = 1;
 	NRF_TIMER2->TASKS_START = 1;
-    NRF_TIMER3->TASKS_START = 1;
+    // NRF_TIMER3->TASKS_START = 1;
     NRF_LOG_INFO("Everything inited!!!!!");
-    nrf_gpio_pin_set(output_pin);
+    
     // saadc_init();
     // saadc_sampling_event_init();
     
@@ -880,7 +890,6 @@ int main(void)
     // Enter main loop.
     for (;;)
     {
-
             NRF_LOG_PROCESS();
         // idle_state_handle();
         // nrf_delay_us(3000);        
