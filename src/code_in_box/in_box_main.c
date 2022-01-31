@@ -103,7 +103,7 @@ ble_gatts_char_handles_t voltage_char_handles;                                  
 ble_gatts_char_handles_t temperature_1_char_handles;                             /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles;                             /** Temperature Sensor 2 Characteristic */
 
-
+#define output_pin NRF_GPIO_PIN_MAP(0,22)
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -388,7 +388,7 @@ static void ble_advertising_start(void)
 {
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-    bsp_board_led_on(ADVERTISING_LED);
+    // bsp_board_led_on(ADVERTISING_LED);
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
     NRF_LOG_DEBUG("Advertising Init");
     #endif
@@ -687,6 +687,41 @@ static void log_init(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
+void battery_relay(void)
+{
+    nrf_gpio_cfg_output(output_pin);
+    bsp_board_led_on(LEDBUTTON_LED);
+    for(int i = 0; i < 10; i++)
+    {
+        bsp_board_led_off(LEDBUTTON_LED);
+        nrf_gpio_pin_clear(output_pin);
+        nrf_delay_us(600000);  
+        bsp_board_led_on(LEDBUTTON_LED);
+        nrf_gpio_pin_set(output_pin);
+        nrf_delay_us(600000);
+    }
+    
+    nrf_gpio_pin_clear(output_pin);
+    bsp_board_led_off(LEDBUTTON_LED);
+    nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
+    nrf_delay_us(6000000);
+    bsp_board_led_on(LEDBUTTON_LED);
+
+
+
+    // double ADC_REF_VOLTAGE = 3.6; //[V]
+    // double THRESHOLD_VOLTAGE = 3.3; //Volts
+    // if(ADC_REF_VOLTAGE < THRESHOLD_VOLTAGE)
+    // {
+        //Does this always need to be set high?
+        //nrf_gpio_cfg_pin_output(output_pin);
+        //nrf_gpio_pin_set(output_pin); //set as high
+        //nrf_gpio_pin_clear(output_pin); //set as low
+        //set the GPIO pin to high to switch the relay
+    // }
+
+}
+
 
 // /**@brief Function for initializing power management.
 //  */
@@ -737,9 +772,13 @@ int main(void)
     ble_advertising_start();
 
     // Enter main loop.
+    battery_relay();
     for (;;)
     {
-
+        //Sample LiPo voltage at the beginning of each cycle
+            //either send the relay here or have another 
+        // nrf_delay_us(10000); 
+        // if below threshhold send a BOOL to switch to other battery
             NRF_LOG_PROCESS();
         // idle_state_handle();
         // nrf_delay_us(3000);        
