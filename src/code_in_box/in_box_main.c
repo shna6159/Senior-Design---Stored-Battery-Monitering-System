@@ -703,8 +703,8 @@ void battery_relay(void)
     
     nrf_gpio_pin_clear(output_pin);
     bsp_board_led_off(LEDBUTTON_LED);
-    nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
-    nrf_delay_us(6000000);
+    // nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
+    // nrf_delay_us(6000000);
     bsp_board_led_on(LEDBUTTON_LED);
 
 
@@ -750,37 +750,47 @@ void battery_relay(void)
 int main(void)
 {
     // Initialize.
-    log_init();
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-        NRF_LOG_INFO("Program Start");
-    #endif
+    // log_init();
+    // #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
+    //     NRF_LOG_INFO("Program Start");
+    // #endif
     // power_management_init();
-    leds_init();
-    timers_init();
-    button_init();
+    // leds_init();
+    // timers_init();
+    // button_init();
 
-    ble_stack_init();
-    ble_gap_params_init();
-    ble_gatt_init();
-    ble_services_init();
-    ble_advertising_init();
-    ble_connection_params_init();
+    // ble_stack_init();
+    // ble_gap_params_init();
+    // ble_gatt_init();
+    // ble_services_init();
+    // ble_advertising_init();
+    // ble_connection_params_init();
 
-    saadc_init();
-    saadc_sampling_event_init();
-    // Start execution.
-    ble_advertising_start();
+    // saadc_init();
+    // saadc_sampling_event_init();
+    // // Start execution.
+    // ble_advertising_start();
 
-    // Enter main loop.
-    battery_relay();
+    // // Enter main loop.
+    // battery_relay();
+    //             nrf_delay_us(6000000);
+    // sd_ble_gap_adv_stop(m_adv_handle);
+    // bsp_board_led_off(LEDBUTTON_LED);
+    // NRF_SAADC->TASKS_STOP = 1;
+    // nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_STAY_IN_SYSOFF);
+    // sd_app_evt_wait
     for (;;)
     {
-        //Sample LiPo voltage at the beginning of each cycle
-            //either send the relay here or have another 
-        // nrf_delay_us(10000); 
-        // if below threshhold send a BOOL to switch to other battery
-            NRF_LOG_PROCESS();
-        // idle_state_handle();
-        // nrf_delay_us(3000);        
+    // //     //Sample LiPo voltage at the beginning of each cycle
+    // //         //either send the relay here or have another 
+    // //     // nrf_delay_us(10000); 
+    // //     // if below threshhold send a BOOL to switch to other battery
+    // //         // NRF_LOG_PROCESS();
+            nrf_pwr_mgmt_run();
+    //         sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
+    // sd_app_evt_wait();
+
+    // //     // idle_state_handle();
+    // //     // nrf_delay_us(3000);        
     }
 }
