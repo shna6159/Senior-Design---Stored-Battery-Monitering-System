@@ -701,11 +701,8 @@ void battery_relay(void)
         nrf_delay_us(600000);
     }
     
-    nrf_gpio_pin_clear(output_pin);
+    // nrf_gpio_pin_clear(output_pin);
     bsp_board_led_off(LEDBUTTON_LED);
-    // nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
-    // nrf_delay_us(6000000);
-    bsp_board_led_on(LEDBUTTON_LED);
 
 
 
@@ -755,7 +752,7 @@ int main(void)
     //     NRF_LOG_INFO("Program Start");
     // #endif
     // power_management_init();
-    // leds_init();
+    leds_init();
     // timers_init();
     // button_init();
 
@@ -772,13 +769,16 @@ int main(void)
     // ble_advertising_start();
 
     // // Enter main loop.
-    // battery_relay();
+    battery_relay();
     //             nrf_delay_us(6000000);
     // sd_ble_gap_adv_stop(m_adv_handle);
     // bsp_board_led_off(LEDBUTTON_LED);
     // NRF_SAADC->TASKS_STOP = 1;
     // nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_STAY_IN_SYSOFF);
     // sd_app_evt_wait
+    // bsp_board_led_on(LEDBUTTON_LED);
+
+    // battery_relay();
     for (;;)
     {
     // //     //Sample LiPo voltage at the beginning of each cycle
