@@ -35,10 +35,10 @@
 #define SAMPLES_IN_BUFFER 1
 #define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 
-static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
-static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
-static nrf_ppi_channel_t     m_ppi_channel;
-static uint32_t              m_adc_evt_counter;
+// static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
+// static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
+// static nrf_ppi_channel_t     m_ppi_channel;
+// static uint32_t              m_adc_evt_counter;
 
 
 typedef enum
@@ -633,27 +633,27 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
     // Start execution.
-    // ret_code_t err_code;
-    // nrf_saadc_value_t sample;
+    ret_code_t err_code;
+    nrf_saadc_value_t sample;
 
-    // err_code = NRF_LOG_INIT(NULL);
-    // APP_ERROR_CHECK(err_code);
+    err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
 
-    // NRF_LOG_DEFAULT_BACKENDS_INIT();
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
 
-    // saadc_init();
+    saadc_init();
     ble_advertising_start();
 
-    while (1)
+    for(;;)
     {
-        // err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
-        // APP_ERROR_CHECK(err_code);
+        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
+        APP_ERROR_CHECK(err_code);
 
-        // NRF_LOG_INFO("Sample: %i", sample);
-        // ble_write_to_characteristic(sample, voltage_char_handles);
+        NRF_LOG_INFO("Sample: %i", sample);
+        ble_write_to_characteristic(sample, voltage_char_handles);
         NRF_LOG_FLUSH();
         // bsp_board_led_on(LEDBUTTON_LED);
-        // nrf_delay_ms(5000);
+        nrf_delay_ms(5000);
         // bsp_board_led_off(LEDBUTTON_LED);
         // nrf_delay_ms(5000);
     }
