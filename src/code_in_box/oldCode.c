@@ -103,7 +103,7 @@ ble_gatts_char_handles_t voltage_char_handles;                                  
 ble_gatts_char_handles_t temperature_1_char_handles;                             /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles;                             /** Temperature Sensor 2 Characteristic */
 
-#define SAADC_CHANNEL 0
+
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
