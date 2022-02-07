@@ -23,6 +23,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include "nrf_drv_saadc.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_timer.h"
@@ -34,6 +35,7 @@
 
 #include "nrf_gpio.h"
 #include "nrf_drv_gpiote.h"
+
 #define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0,11)
 #define output_pin NRF_GPIO_PIN_MAP(0,12)
 
@@ -792,6 +794,7 @@ static void ppi_gpiote_counter_init_rising()
 	*(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
     *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
 	NRF_PPI->CHENSET |= 1 << 1;
+
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
         NRF_LOG_INFO("ppi_gpiote_counter_init_rising");
     #endif
@@ -803,8 +806,9 @@ static void ppi_gpiote_counter_init_falling()
 	*(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
     *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[3];
 	NRF_PPI->CHENSET |= 1 << 2;
+
     #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-        NRF_LOG_INFO("ppi_gpiote_counter_init_timer3");
+        NRF_LOG_INFO("ppi_gpiote_counter_init_falling");
     #endif
 }
 void TIMER1_IRQHandler(void) 
@@ -820,14 +824,15 @@ void TIMER1_IRQHandler(void)
         
         #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
             NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
-            // NRF_LOG_INFO("num falling edges: %d", NRF_TIMER3->CC[0]);
             NRF_LOG_INFO("Timer 1 -> rising edge tick: %d", NRF_TIMER1->CC[2]);
             NRF_LOG_INFO("Timer 1 -> falling edge tick: %d", NRF_TIMER1->CC[3]);
             NRF_LOG_INFO("Pulse width: %d ns", NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2]);
-            // NRF_LOG_INFO("Temperature: %f [deg]", );
-            // double DC=NRF_TIMER2->CC[0]*(NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2])/16000000;
-            float DC = 22/7;
-            NRF_LOG_ERROR( "DC " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(DC));
+
+            double DC=(double)(NRF_TIMER2->CC[0])*(NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2])/16000000;
+            NRF_LOG_ERROR( "Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(DC));
+
+            double temperature = -1.43 * pow(DC, 2) + 214.56*DC - 68.60;
+            NRF_LOG_ERROR( "Temperature [Deg C]" NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
         #endif
         
 
@@ -838,7 +843,7 @@ void TIMER1_IRQHandler(void)
 		NRF_TIMER1->TASKS_CLEAR = 1;
 		NRF_TIMER2->TASKS_CLEAR = 1;
 
-        NRF_TIMER2->TASKS_START = 1;	
+        // NRF_TIMER2->TASKS_START = 1;
 
     }
 }
@@ -876,22 +881,27 @@ int main(void)
     ppi_gpiote_counter_init_falling();
 	ppi_timer_stop_counter_init();
 
+
     NRF_TIMER1->TASKS_START = 1;
-	NRF_TIMER2->TASKS_START = 1;
+    NRF_TIMER2->TASKS_START = 1;
+    nrf_delay_us(3000000); 
+
+
     NRF_LOG_INFO("Everything inited!!!!!");
     
-    saadc_init();
-    saadc_sampling_event_init();
+    // saadc_init();
+    // saadc_sampling_event_init();
     
     // Start execution.
     ble_advertising_start();
+
 
     // Enter main loop.
     for (;;)
     {
             NRF_LOG_PROCESS();
         // idle_state_handle();
-        // nrf_delay_us(3000);  
+ 
               
     }
 }
