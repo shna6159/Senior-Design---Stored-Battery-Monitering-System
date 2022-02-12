@@ -38,14 +38,6 @@
 #define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0, 11)
 #define output_pin NRF_GPIO_PIN_MAP(0, 12)
 
-#define SAMPLES_IN_BUFFER 1
-#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED // Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
-
-static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(3);
-static nrf_saadc_value_t m_buffer_pool[2][SAMPLES_IN_BUFFER];
-static nrf_ppi_channel_t m_ppi_channel;
-static uint32_t m_adc_evt_counter;
-
 #define TX_POWER_LEVEL 8
 
 #define ADVERTISING_LED BSP_BOARD_LED_0 /**< Is on when device is advertising. */
@@ -513,132 +505,6 @@ static void button_init(void)
     app_button_enable();
 }
 
-/**@brief Function collecting a sample from the GPIO pins
- */
-void saadc_timer_handler(nrf_timer_event_t event_type, void *p_context)
-{
-    // NRF_LOG_DEBUG("Timer interrupt");
-
-    NRF_SAADC->TASKS_SAMPLE = 1;
-    /*
-    // Alternatively, you can use the driver to trigger a sample:
-    nrf_drv_saadc_sample();
-    */
-}
-
-/**@brief Function to setup how frequently sampling should be done
- */
-void saadc_sampling_event_init(void)
-{
-    ret_code_t err_code;
-
-    err_code = nrf_drv_ppi_init();
-    APP_ERROR_CHECK(err_code);
-
-    nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
-    timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
-    err_code = nrf_drv_timer_init(&m_timer, &timer_cfg, saadc_timer_handler);
-    APP_ERROR_CHECK(err_code);
-
-    /* setup m_timer for compare event every 1000ms */
-    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer, 1000);
-
-    nrf_drv_timer_extended_compare(&m_timer,
-                                   NRF_TIMER_CC_CHANNEL0,
-                                   ticks,
-                                   NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
-                                   true);
-    nrf_drv_timer_enable(&m_timer);
-
-    uint32_t timer_compare_event_addr = nrf_drv_timer_compare_event_address_get(&m_timer,
-                                                                                NRF_TIMER_CC_CHANNEL0);
-    uint32_t saadc_sample_task_addr = nrf_drv_saadc_sample_task_get();
-
-    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
-    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel,
-                                          timer_compare_event_addr,
-                                          saadc_sample_task_addr);
-    APP_ERROR_CHECK(err_code);
-}
-
-/**@brief Function enabling the PPI(programmable peripheral interconnect) peripheral to allow the SAADC to sample without intervention from the CPU
- */
-void saadc_sampling_event_enable(void)
-{
-    ret_code_t err_code = nrf_drv_ppi_channel_enable(m_ppi_channel);
-
-    APP_ERROR_CHECK(err_code);
-}
-
-/**@brief Function for setting up the SAADC callback function
- *
- * param p_event Event descriptor for the SAADC event
- */
-void saadc_callback(nrf_drv_saadc_evt_t const *p_event)
-{
-    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-    {
-        ret_code_t err_code;
-
-        err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
-        APP_ERROR_CHECK(err_code);
-
-        int i;
-
-        NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
-
-        double V;
-        UNUSED_VARIABLE(V);
-        uint8_t ADC_RESOLUTION = 12;
-        uint8_t ADC_SCALING = 3;
-        double ADC_REF_VOLTAGE = 3.3; //[V]
-        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {
-            // TODO: Eventually add a string here with all the data
-            V = (((p_event->data.done.p_buffer[i] * ADC_REF_VOLTAGE) / (2 ^ (ADC_RESOLUTION - 1)) / ADC_SCALING));
-
-            NRF_LOG_INFO("ADC val %d", p_event->data.done.p_buffer[i]);
-            NRF_LOG_INFO("ADC Convertied Voltage [V] %f", V);
-
-            ble_write_to_characteristic(p_event->data.done.p_buffer[i], voltage_char_handles);
-        }
-        m_adc_evt_counter++;
-    }
-}
-
-/**@brief Function for setting up the SAADC peripheral.
- */
-void saadc_init(void)
-{
-    ret_code_t err_code;
-    nrf_saadc_channel_config_t channel_config =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN5);
-    // Configure SAADC
-    //  nrf_drv_saadc_config_t saadc_config;
-    //  saadc_config.low_power_mode = true;                                                   //Enable low power mode.
-    //  saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 //Set SAADC resolution to 12-bit. This will make the SAADC output values from 0 (when input voltage is 0V) to 2^12=4096 (when input voltage is 3.6V for channel gain setting of 1/6).
-    //  saadc_config.oversample = SAADC_OVERSAMPLE;                                           //Set oversample to 4x. This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times.
-    //  saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;                               //Set SAADC interrupt to low priority.
-    err_code = nrf_drv_saadc_init(NULL, saadc_callback);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_channel_init(0, &channel_config);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_INFO("SAADC INIT");
-
-    nrf_drv_saadc_calibrate_offset();
-}
-
 /**@brief Function for setting up logs.
  */
 static void log_init(void)
@@ -678,7 +544,7 @@ static void timer_init()
 
     NRF_TIMER1->TASKS_STOP = 1;
     NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-    NRF_TIMER1->PRESCALER = 0;    // uses 16 MHz clk
+    NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
     NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
 
     NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
@@ -699,7 +565,6 @@ static void counter_init()
     NRF_TIMER2->EVENTS_COMPARE[0] = 0;
 
     NRF_LOG_DEBUG("Timer2 setup");
-
 }
 static void setup_gpiote_event(uint32_t pin)
 {
@@ -715,7 +580,6 @@ static void setup_gpiote_event(uint32_t pin)
 
     NRF_LOG_DEBUG("gpiote_init_falling edge");
 }
-
 
 static void setup_timer_and_counter_ppi()
 {
@@ -742,7 +606,6 @@ static void setup_timer_and_counter_ppi()
     NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
 }
 
-
 uint8_t valid_temp_counter = 0;
 double valid_duty_cycle[80];
 
@@ -756,32 +619,37 @@ void TIMER1_IRQHandler(void)
         NRF_TIMER2->TASKS_STOP = 1;
         int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
 
-        if((pulse_width) < 0){
+        if ((pulse_width) < 0)
+        {
             NRF_TIMER1->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
 
             NRF_TIMER1->TASKS_START = 1;
             NRF_TIMER2->TASKS_START = 1;
         }
-        else{
+        else
+        {
             uint16_t frequency = NRF_TIMER2->CC[0] * 4 * 100;
             double duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
 
-            if(valid_temp_counter == 80){
+            if (valid_temp_counter == 80)
+            {
                 NRF_LOG_INFO("cc: %dHz", frequency);
                 NRF_TIMER1->TASKS_CLEAR = 1;
                 NRF_TIMER2->TASKS_CLEAR = 1;
-                double average_duty_cycle = 0; 
-                for(uint8_t i = 0; i<80;i++){
+                double average_duty_cycle = 0;
+                for (uint8_t i = 0; i < 80; i++)
+                {
                     average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
                 }
-                average_duty_cycle = average_duty_cycle/80;
+                average_duty_cycle = average_duty_cycle / 80;
                 NRF_LOG_DEBUG("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
                 double temperature = -1.43 * pow(average_duty_cycle, 2) + 214.56 * average_duty_cycle - 68.60;
                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
                 valid_temp_counter = 0;
             }
-            else{
+            else
+            {
                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
                 valid_temp_counter += 1;
                 NRF_TIMER1->TASKS_CLEAR = 1;
@@ -799,9 +667,9 @@ int main(void)
 {
     // Initialize.
     log_init();
-
+    NRF_LOG_FLUSH();
     NRF_LOG_INFO("Program Start!!!!");
-
+    NRF_LOG_FLUSH();
     // power_management_init();
     leds_init();
     timers_init();
@@ -814,24 +682,20 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
-
-    // nrf_gpio_cfg_output(output_pin);
+    // temp sensor code
     timer_init();
     counter_init();
     setup_gpiote_event(FREQ_MEASURE_PIN);
     setup_timer_and_counter_ppi();
-
-    // saadc_init();
-    // saadc_sampling_event_init();
+    NRF_TIMER1->TASKS_START = 1;
+    NRF_TIMER2->TASKS_START = 1;
 
     // Start execution.
 
     NRF_LOG_INFO("Everything inited!!!!!");
 
-    NRF_TIMER1->TASKS_START = 1;
-    NRF_TIMER2->TASKS_START = 1;
     ble_advertising_start();
-    NRF_LOG_FLUSH();
+
 
     // Enter main loop.
     for (;;)
