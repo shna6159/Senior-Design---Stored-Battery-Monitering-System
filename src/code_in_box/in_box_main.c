@@ -569,14 +569,39 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 void saadc_init(void)
 {
     ret_code_t err_code;
-    nrf_saadc_channel_config_t channel_config =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    nrf_saadc_channel_config_t channel_config;
+    //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
+    channel_config.pin_p      = NRF_SAADC_INPUT_AIN1;
+    channel_config.pin_n      = NRF_SAADC_INPUT_AIN5;
+    channel_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
+    channel_config.acq_time   = NRF_SAADC_ACQTIME_40US;
+    channel_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    // channel_config.gain       = NRF_SAADC_GAIN1_6;
+    channel_config.gain       = NRF_SAADC_GAIN1_2;
+    channel_config.resistor_p = NRF_SAADC_RESISTOR_PULLDOWN;
+    channel_config.resistor_n = NRF_SAADC_RESISTOR_PULLUP;
+    channel_config.burst      = NRF_SAADC_BURST_ENABLED;
 
-    err_code = nrf_drv_saadc_init(NULL, saadc_callback);
+    // channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
+    // channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
+
+    nrf_drv_saadc_config_t saadc_config;
+    saadc_config.interrupt_priority = APP_IRQ_PRIORITY_HIGHEST;
+    saadc_config.low_power_mode = false;
+    saadc_config.oversample = NRF_SAADC_OVERSAMPLE_DISABLED;
+    saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
+    // saadc_config.scaling    = NRF_ADC_CONFIG_SCALING_INPUT_ONE_THIRD;
+    saadc_config.reference  = NRF_ADC_CONFIG_REF_VBG;
+
+
+    err_code = nrf_drv_saadc_init(&saadc_config, saadc_callback);
+
+    // err_code = nrf_drv_saadc_init(NULL, saadc_callback);
     APP_ERROR_CHECK(err_code);
-
+    
     err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL, &channel_config);
     APP_ERROR_CHECK(err_code);
+    nrf_drv_saadc_calibrate_offset();
 }
 
 /**@brief Function for setting up logs.
@@ -636,24 +661,22 @@ int main(void)
     ret_code_t err_code;
     nrf_saadc_value_t sample;
 
-    err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-
     saadc_init();
     ble_advertising_start();
+    sd_ble_gap_adv_stop(m_adv_handle);
 
     for(;;)
     {
         err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
         APP_ERROR_CHECK(err_code);
 
-        NRF_LOG_INFO("Sample: %i", sample);
-        ble_write_to_characteristic(sample, voltage_char_handles);
+        double V = (double)(((sample * 1.2) / (4095)) * 3);
+        NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
+        // NRF_LOG_INFO("sample: %d", V);
+        // ble_write_to_characteristic(sample, voltage_char_handles);
         NRF_LOG_FLUSH();
         // bsp_board_led_on(LEDBUTTON_LED);
-        nrf_delay_ms(5000);
+        nrf_delay_ms(300);
         // bsp_board_led_off(LEDBUTTON_LED);
         // nrf_delay_ms(5000);
     }

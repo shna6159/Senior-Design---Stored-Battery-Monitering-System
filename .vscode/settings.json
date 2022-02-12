@@ -3,5 +3,8 @@
     "nrf-connect.topdir": "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SDK\\v1.7.0",
     "nrf-connect.applications": [
         "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SBMS"
-    ]
+    ],
+    "files.associations": {
+        "algorithm": "c"
+    }
 }
