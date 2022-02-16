@@ -589,7 +589,7 @@ static void setup_timer_and_counter_ppi()
     *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
     NRF_PPI->CHENSET |= 1 << 1;
 
-    NRF_LOG_DEBUG("setup_counter_ppi");
+    NRF_LOG_DEBUG("ppi_gpiote_counter_init_rising");
 
     NRF_PPI->CHEN |= 1 << 2;
     *(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
@@ -600,7 +600,8 @@ static void setup_timer_and_counter_ppi()
 
     NRF_PPI->CHEN |= 1 << 0;
     *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
-    *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
+    *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
+    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_STOP;
     NRF_PPI->CHENSET |= 1 << 0;
 
     NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
@@ -614,9 +615,8 @@ void TIMER1_IRQHandler(void)
     if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
     {
         NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-        NRF_TIMER2->TASKS_CAPTURE[0] = 1;
-        NRF_TIMER1->TASKS_STOP = 1;
-        NRF_TIMER2->TASKS_STOP = 1;
+        NRF_TIMER2->TASKS_STOP;
+
         int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
 
         if ((pulse_width) < 0)
@@ -631,29 +631,31 @@ void TIMER1_IRQHandler(void)
         {
             uint16_t frequency = NRF_TIMER2->CC[0] * 4 * 100;
             double duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
+            NRF_TIMER1->TASKS_CLEAR = 1;
+            NRF_TIMER2->TASKS_CLEAR = 1;
 
             if (valid_temp_counter == 80)
             {
                 NRF_LOG_INFO("cc: %dHz", frequency);
-                NRF_TIMER1->TASKS_CLEAR = 1;
-                NRF_TIMER2->TASKS_CLEAR = 1;
+                frequency = 6124;
                 double average_duty_cycle = 0;
                 for (uint8_t i = 0; i < 80; i++)
                 {
                     average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
                 }
                 average_duty_cycle = average_duty_cycle / 80;
-                NRF_LOG_DEBUG("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
+                NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
                 double temperature = -1.43 * pow(average_duty_cycle, 2) + 214.56 * average_duty_cycle - 68.60;
                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
                 valid_temp_counter = 0;
+                NRF_TIMER1->TASKS_START = 1;
+                NRF_TIMER2->TASKS_START = 1;
             }
             else
             {
                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
                 valid_temp_counter += 1;
-                NRF_TIMER1->TASKS_CLEAR = 1;
-                NRF_TIMER2->TASKS_CLEAR = 1;
+
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
@@ -687,14 +689,14 @@ int main(void)
     counter_init();
     setup_gpiote_event(FREQ_MEASURE_PIN);
     setup_timer_and_counter_ppi();
-    NRF_TIMER1->TASKS_START = 1;
-    NRF_TIMER2->TASKS_START = 1;
+
+                NRF_TIMER1->TASKS_START = 1;
+                NRF_TIMER2->TASKS_START = 1;
 
     // Start execution.
 
-    NRF_LOG_INFO("Everything inited!!!!!");
 
-    ble_advertising_start();
+    // ble_advertising_start();
 
 
     // Enter main loop.
