@@ -2579,7 +2579,7 @@
 // <e> NRFX_PPI_ENABLED - nrfx_ppi - PPI peripheral allocator
 //==========================================================
 #ifndef NRFX_PPI_ENABLED
-#define NRFX_PPI_ENABLED 0
+#define NRFX_PPI_ENABLED 1
 #endif
 // <e> NRFX_PPI_CONFIG_LOG_ENABLED - Enables logging in the module.
 //==========================================================
@@ -3938,21 +3938,21 @@
  
 
 #ifndef NRFX_TIMER1_ENABLED
-#define NRFX_TIMER1_ENABLED 0
+#define NRFX_TIMER1_ENABLED 1
 #endif
 
 // <q> NRFX_TIMER2_ENABLED  - Enable TIMER2 instance
  
 
 #ifndef NRFX_TIMER2_ENABLED
-#define NRFX_TIMER2_ENABLED 0
+#define NRFX_TIMER2_ENABLED 1
 #endif
 
 // <q> NRFX_TIMER3_ENABLED  - Enable TIMER3 instance
  
 
 #ifndef NRFX_TIMER3_ENABLED
-#define NRFX_TIMER3_ENABLED 0
+#define NRFX_TIMER3_ENABLED 1
 #endif
 
 // <q> NRFX_TIMER4_ENABLED  - Enable TIMER4 instance
@@ -5644,7 +5644,7 @@
 // <e> TIMER_ENABLED - nrf_drv_timer - TIMER periperal driver - legacy layer
 //==========================================================
 #ifndef TIMER_ENABLED
-#define TIMER_ENABLED 1
+#define TIMER_ENABLED 0
 #endif
 // <o> TIMER_DEFAULT_CONFIG_FREQUENCY  - Timer frequency if in Timer mode
  
@@ -5718,14 +5718,14 @@
  
 
 #ifndef TIMER2_ENABLED
-#define TIMER2_ENABLED 0
+#define TIMER2_ENABLED 1
 #endif
 
 // <q> TIMER3_ENABLED  - Enable TIMER3 instance
  
 
 #ifndef TIMER3_ENABLED
-#define TIMER3_ENABLED 0
+#define TIMER3_ENABLED 1
 #endif
 
 // <q> TIMER4_ENABLED  - Enable TIMER4 instance

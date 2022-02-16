@@ -65,8 +65,8 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_ppi.c \
   $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_ppi.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_saadc.c \
-  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_soc.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
   $(PROJ_DIR)/on_site_main.c \
   
   
@@ -137,6 +137,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/ble/ble_services/ble_hts \
   $(SDK_ROOT)/components/libraries/crc16 \
   $(SDK_ROOT)/components/nfc/t4t_parser/apdu \
+  $(SDK_ROOT)/components/ble/ble_services/ble_nus \
   $(SDK_ROOT)/components/libraries/util \
   ../config \
   $(SDK_ROOT)/components/libraries/usbd/class/cdc \

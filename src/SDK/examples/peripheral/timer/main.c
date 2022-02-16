@@ -53,7 +53,10 @@
 #include "nrf_drv_timer.h"
 #include "bsp.h"
 #include "app_error.h"
-
+#include "nrf_gpio.h"
+#include "nrf_drv_gpiote.h"
+#define p27 NRF_GPIO_PIN_MAP(0,27)
+#define p11 NRF_GPIO_PIN_MAP(0,11)
 const nrf_drv_timer_t TIMER_LED = NRF_DRV_TIMER_INSTANCE(0);
 
 /**
@@ -61,13 +64,16 @@ const nrf_drv_timer_t TIMER_LED = NRF_DRV_TIMER_INSTANCE(0);
  */
 void timer_led_event_handler(nrf_timer_event_t event_type, void* p_context)
 {
-    static uint32_t i;
-    uint32_t led_to_invert = ((i++) % LEDS_NUMBER);
+    // static uint32_t i;
+    // uint32_t led_to_invert = ((i++) % 2);
 
     switch (event_type)
     {
         case NRF_TIMER_EVENT_COMPARE0:
-            bsp_board_led_invert(led_to_invert);
+            // bsp_board_led_invert(led_to_invert);
+            nrf_gpio_pin_toggle(p11);
+            nrf_gpio_pin_toggle(p27);
+
             break;
 
         default:
@@ -87,7 +93,9 @@ int main(void)
     uint32_t err_code = NRF_SUCCESS;
 
     //Configure all leds on board.
-    bsp_board_init(BSP_INIT_LEDS);
+    // bsp_board_init(BSP_INIT_LEDS);
+    nrf_gpio_cfg_output(p11);
+    nrf_gpio_cfg_output(p27);
 
     //Configure TIMER_LED for generating simple light effect - leds on board will invert his state one after the other.
     nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
