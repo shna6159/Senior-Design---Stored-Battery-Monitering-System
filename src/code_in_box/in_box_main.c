@@ -591,7 +591,7 @@ void saadc_init(void)
     saadc_config.oversample = NRF_SAADC_OVERSAMPLE_DISABLED;
     saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
     // saadc_config.scaling    = NRF_ADC_CONFIG_SCALING_INPUT_ONE_THIRD;
-    saadc_config.reference  = NRF_ADC_CONFIG_REF_VBG;
+    // saadc_config.reference  = NRF_ADC_CONFIG_REF_VBG;
 
 
     err_code = nrf_drv_saadc_init(&saadc_config, saadc_callback);
