@@ -3432,7 +3432,7 @@
 // <3=> 14 bit 
 
 #ifndef NRFX_SAADC_CONFIG_RESOLUTION
-#define NRFX_SAADC_CONFIG_RESOLUTION 1
+#define NRFX_SAADC_CONFIG_RESOLUTION 2
 #endif
 
 // <o> NRFX_SAADC_CONFIG_OVERSAMPLE  - Sample period
@@ -3986,7 +3986,7 @@
  
 
 #ifndef NRFX_TIMER2_ENABLED
-#define NRFX_TIMER2_ENABLED 0
+#define NRFX_TIMER2_ENABLED 1
 #endif
 
 // <q> NRFX_TIMER3_ENABLED  - Enable TIMER3 instance
@@ -5482,7 +5482,7 @@
 // <3=> 14 bit 
 
 #ifndef SAADC_CONFIG_RESOLUTION
-#define SAADC_CONFIG_RESOLUTION 1
+#define SAADC_CONFIG_RESOLUTION 2
 #endif
 
 // <o> SAADC_CONFIG_OVERSAMPLE  - Sample period
@@ -5685,7 +5685,7 @@
 // <e> TIMER_ENABLED - nrf_drv_timer - TIMER periperal driver - legacy layer
 //==========================================================
 #ifndef TIMER_ENABLED
-#define TIMER_ENABLED 1
+#define TIMER_ENABLED 0
 #endif
 // <o> TIMER_DEFAULT_CONFIG_FREQUENCY  - Timer frequency if in Timer mode
  
@@ -5759,7 +5759,7 @@
  
 
 #ifndef TIMER2_ENABLED
-#define TIMER2_ENABLED 0
+#define TIMER2_ENABLED 1
 #endif
 
 // <q> TIMER3_ENABLED  - Enable TIMER3 instance

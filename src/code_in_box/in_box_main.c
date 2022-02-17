@@ -20,9 +20,9 @@
 #include "nrf_pwr_mgmt.h"
 #include "nrf_delay.h"
 
-
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include "nrf_drv_saadc.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_timer.h"
@@ -32,47 +32,35 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#define SAMPLES_IN_BUFFER 1
-#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_DISABLED  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
+#include "nrf_gpio.h"
+#include "nrf_drv_gpiote.h"
 
-// static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
-// static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
-// static nrf_ppi_channel_t     m_ppi_channel;
-// static uint32_t              m_adc_evt_counter;
-
-
-typedef enum
-{
-    LOG_LEVEL_INFO  = 1,
-    LOG_LEVEL_DEBUG = 2
-} log_level;
-#define LOG_LEVEL LOG_LEVEL_INFO
-
+#define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0, 11)
+#define output_pin NRF_GPIO_PIN_MAP(0, 12)
 
 #define TX_POWER_LEVEL 8
 
-#define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
-#define CONNECTED_LED                   BSP_BOARD_LED_1                         /**< Is on when device has connected. */
-#define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
-#define UNEXPECTED_LED                  BSP_BOARD_LED_3                         /**< LED to be toggled when the an error occurs */
+#define ADVERTISING_LED BSP_BOARD_LED_0 /**< Is on when device is advertising. */
+#define CONNECTED_LED BSP_BOARD_LED_1   /**< Is on when device has connected. */
+#define LEDBUTTON_LED BSP_BOARD_LED_2   /**< LED to be toggled with the help of the LED Button Service. */
+#define UNEXPECTED_LED BSP_BOARD_LED_3  /**< LED to be toggled when the an error occurs */
 // #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-#define DEVICE_NAME                     "SBMS_in_box"                                  /**< Name of device. Will be included in the advertising data. */
-#define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
-#define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
+#define DEVICE_NAME "SBMS_in_box" /**< Name of device. Will be included in the advertising data. */
+#define APP_BLE_OBSERVER_PRIO 3   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
+#define APP_BLE_CONN_CFG_TAG 1    /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define APP_ADV_INTERVAL                64                                      /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
-#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED   /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
+#define APP_ADV_INTERVAL 64                                    /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
+#define APP_ADV_DURATION BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
 
+#define MIN_CONN_INTERVAL MSEC_TO_UNITS(100, UNIT_1_25_MS) /**< Minimum acceptable connection interval (0.5 seconds). */
+#define MAX_CONN_INTERVAL MSEC_TO_UNITS(200, UNIT_1_25_MS) /**< Maximum acceptable connection interval (1 second). */
+#define SLAVE_LATENCY 0                                    /**< Slave latency. */
+#define CONN_SUP_TIMEOUT MSEC_TO_UNITS(4000, UNIT_10_MS)   /**< Connection supervisory time-out (4 seconds). */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.5 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(200, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (1 second). */
-#define SLAVE_LATENCY                   0                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory time-out (4 seconds). */
-
-#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(20000)                  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (15 seconds). */
-#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                   /**< Time between each call to sd_ble_gap_conn_param_update after the first call (5 seconds). */
-#define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
+#define FIRST_CONN_PARAMS_UPDATE_DELAY APP_TIMER_TICKS(20000) /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (15 seconds). */
+#define NEXT_CONN_PARAMS_UPDATE_DELAY APP_TIMER_TICKS(5000)   /**< Time between each call to sd_ble_gap_conn_param_update after the first call (5 seconds). */
+#define MAX_CONN_PARAMS_UPDATE_COUNT 3                        /**< Number of attempts before giving up the connection parameter negotiation. */
 
 // #define TX_POWER_LEVEL -8
 // #define TX_POWER_LEVEL 0
@@ -83,43 +71,41 @@ typedef enum
 
 // #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define UUID_BASE {0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00}
+#define UUID_BASE                                                                                      \
+    {                                                                                                  \
+        0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00 \
+    }
 #define UUID_SERVICE 0x1234
 #define UUID_VOLTAGE_CHAR 0x1234
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 
+NRF_BLE_GATT_DEF(m_gatt); /**< GATT module instance. */
+NRF_BLE_QWR_DEF(m_qwr);   /**< Context for the Queued Write module.*/
 
+static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                /**< Handle of the current connection. */
+static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;           /**< Advertising handle used to identify an advertising set. */
+static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];            /**< Buffer for storing an encoded advertising set. */
+static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Buffer for storing an encoded scan data. */
 
-NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
-NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
-
-static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
-static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
-static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
-static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];         /**< Buffer for storing an encoded scan data. */
-
-ble_gatts_char_handles_t voltage_char_handles;                                   /** Voltage Sensor Characteristic */
-ble_gatts_char_handles_t temperature_1_char_handles;                             /** Temperature Sensor 1 Characteristic */
-ble_gatts_char_handles_t temperature_2_char_handles;                             /** Temperature Sensor 2 Characteristic */
+ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characteristic */
+ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
+ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
 
 #define SAADC_CHANNEL 0
-
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
-{
-    .adv_data =
     {
-        .p_data = m_enc_advdata,
-        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
-    },
-    .scan_rsp_data =
-    {
-        .p_data = m_enc_scan_response_data,
-        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
+        .adv_data =
+            {
+                .p_data = m_enc_advdata,
+                .len = BLE_GAP_ADV_SET_DATA_SIZE_MAX},
+        .scan_rsp_data =
+            {
+                .p_data = m_enc_scan_response_data,
+                .len = BLE_GAP_ADV_SET_DATA_SIZE_MAX
 
-    }
-};
+            }};
 
 // /**@brief Function for assert macro callback.
 //  *
@@ -142,13 +128,10 @@ Descripttion : Sets up all the the LEDs used by the program
 */
 static void leds_init(void)
 {
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
     NRF_LOG_DEBUG("LED init");
-    #endif
+
     bsp_board_init(BSP_INIT_LEDS);
-
 }
-
 
 // /**@brief Function for the Timer initialization.
 //  *
@@ -157,13 +140,12 @@ static void leds_init(void)
 static void timers_init(void)
 {
     // Initialize timer module, making it use the scheduler
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+
     NRF_LOG_DEBUG("TIMER init");
-    #endif
+
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
 }
-
 
 /**@brief Function for the GAP initialization.
  *
@@ -173,41 +155,37 @@ static void timers_init(void)
 static void ble_gap_params_init(void)
 {
     // ret_code_t              err_code;
-    ble_gap_conn_params_t   gap_conn_params;
+    ble_gap_conn_params_t gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
     sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
-    
+                               (const uint8_t *)DEVICE_NAME,
+                               strlen(DEVICE_NAME));
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
 
     gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
     gap_conn_params.max_conn_interval = MAX_CONN_INTERVAL;
-    gap_conn_params.slave_latency     = SLAVE_LATENCY;
-    gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
+    gap_conn_params.slave_latency = SLAVE_LATENCY;
+    gap_conn_params.conn_sup_timeout = CONN_SUP_TIMEOUT;
 
     sd_ble_gap_ppcp_set(&gap_conn_params);
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("GAP init");
-    #endif
-}
 
+    NRF_LOG_DEBUG("GAP init");
+}
 
 // /**@brief Function for initializing the GATT module.
 //  */
 static void ble_gatt_init(void)
 {
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+
     NRF_LOG_DEBUG("GATT init");
-    #endif
+
     ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, NULL);
     APP_ERROR_CHECK(err_code);
 }
-
 
 /**@brief Function for initializing the Advertising functionality.
  *
@@ -227,10 +205,9 @@ static void ble_advertising_init(void)
 
     sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &ble_uuid, &service_handle);
 
-
     // Setup characteristic paramters
 
-    memset(&add_char_params, 0 , sizeof(add_char_params));
+    memset(&add_char_params, 0, sizeof(add_char_params));
     add_char_params.uuid_type = uuid_type;
     add_char_params.init_len = sizeof(uint16_t);
     add_char_params.max_len = sizeof(uint16_t);
@@ -240,15 +217,13 @@ static void ble_advertising_init(void)
     add_char_params.cccd_write_access = SEC_OPEN;
 
     add_char_params.uuid = UUID_VOLTAGE_CHAR;
-    characteristic_add(service_handle, &add_char_params, &voltage_char_handles);         //Setup voltage characteristic
+    characteristic_add(service_handle, &add_char_params, &voltage_char_handles); // Setup voltage characteristic
 
     add_char_params.uuid = UUID_TEMPERATURE_1_CHAR;
-    characteristic_add(service_handle, &add_char_params, &temperature_1_char_handles);   //Setup_temperature characteristic
+    characteristic_add(service_handle, &add_char_params, &temperature_1_char_handles); // Setup_temperature characteristic
 
     add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
-    characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles);   //Setup_temperature characteristic
-
-
+    characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles); // Setup_temperature characteristic
 
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
 
@@ -258,39 +233,34 @@ static void ble_advertising_init(void)
     ble_uuid_t adv_uuids[] = {{UUID_SERVICE, uuid_type}};
     memset(&advdata, 0, sizeof(advdata));
 
-    advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+    advdata.name_type = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance = true;
-    advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
-
+    advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
 
     memset(&srdata, 0, sizeof(srdata));
     srdata.uuids_complete.uuid_cnt = sizeof(adv_uuids) / sizeof(adv_uuids[0]);
-    srdata.uuids_complete.p_uuids  = adv_uuids;
+    srdata.uuids_complete.p_uuids = adv_uuids;
 
-     ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
-    
+    ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
 
-     ble_advdata_encode(&srdata, m_adv_data.scan_rsp_data.p_data, &m_adv_data.scan_rsp_data.len);
-    
+    ble_advdata_encode(&srdata, m_adv_data.scan_rsp_data.p_data, &m_adv_data.scan_rsp_data.len);
 
     ble_gap_adv_params_t adv_params;
 
     // Set advertising parameters.
     memset(&adv_params, 0, sizeof(adv_params));
 
-    adv_params.primary_phy     = BLE_GAP_PHY_1MBPS;
-    adv_params.duration        = APP_ADV_DURATION;
+    adv_params.primary_phy = BLE_GAP_PHY_1MBPS;
+    adv_params.duration = APP_ADV_DURATION;
     adv_params.properties.type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
-    adv_params.p_peer_addr     = NULL;
-    adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
-    adv_params.interval        = APP_ADV_INTERVAL;
+    adv_params.p_peer_addr = NULL;
+    adv_params.filter_policy = BLE_GAP_ADV_FP_ANY;
+    adv_params.interval = APP_ADV_INTERVAL;
 
-     sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
+    sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
+
     NRF_LOG_DEBUG("Advertising init");
-    #endif
 }
-
 
 /**@brief Function for handling Queued Write Module errors.
  *
@@ -301,9 +271,8 @@ static void ble_advertising_init(void)
  */
 static void nrf_qwr_error_handler(uint32_t nrf_error)
 {
-    // APP_ERROR_HANDLER(nrf_error); // Ignore errors TODO: 
+    // APP_ERROR_HANDLER(nrf_error); // Ignore errors TODO:
 }
-
 
 /**@brief Function for initializing services that will be used by the application.
  */
@@ -317,11 +286,9 @@ static void ble_services_init(void)
 
     nrf_ble_qwr_init(&m_qwr, &qwr_init);
     // APP_ERROR_CHECK(err_code);
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("BLE Services init");
-    #endif
-}
 
+    NRF_LOG_DEBUG("BLE Services init");
+}
 
 /**@brief Function for handling the Connection Parameters Module.
  *
@@ -334,17 +301,14 @@ static void ble_services_init(void)
  *
  * @param[in] p_evt  Event received from the Connection Parameters Module.
  */
-static void on_conn_params_evt(ble_conn_params_evt_t * p_evt)
+static void on_conn_params_evt(ble_conn_params_evt_t *p_evt)
 {
-    
 
     if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED)
     {
-     sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
-    
+        sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
     }
 }
-
 
 /**@brief Function for handling a Connection Parameters error.
  *
@@ -355,7 +319,6 @@ static void conn_params_error_handler(uint32_t nrf_error)
     // APP_ERROR_HANDLER(nrf_error);
 }
 
-
 /**@brief Function for initializing the Connection Parameters module.
  */
 static void ble_connection_params_init(void)
@@ -365,22 +328,20 @@ static void ble_connection_params_init(void)
 
     memset(&cp_init, 0, sizeof(cp_init));
 
-    cp_init.p_conn_params                  = NULL;
+    cp_init.p_conn_params = NULL;
     cp_init.first_conn_params_update_delay = FIRST_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
-    cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = false;
-    cp_init.evt_handler                    = on_conn_params_evt;
-    cp_init.error_handler                  = conn_params_error_handler;
+    cp_init.next_conn_params_update_delay = NEXT_CONN_PARAMS_UPDATE_DELAY;
+    cp_init.max_conn_params_update_count = MAX_CONN_PARAMS_UPDATE_COUNT;
+    cp_init.start_on_notify_cccd_handle = BLE_GATT_HANDLE_INVALID;
+    cp_init.disconnect_on_fail = false;
+    cp_init.evt_handler = on_conn_params_evt;
+    cp_init.error_handler = conn_params_error_handler;
 
     ble_conn_params_init(&cp_init);
     // APP_ERROR_CHECK(err_code);
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-    NRF_LOG_DEBUG("BLE connection paramters init");
-    #endif
-}
 
+    NRF_LOG_DEBUG("BLE connection paramters init");
+}
 
 /**@brief Function for starting advertising.
  */
@@ -389,46 +350,42 @@ static void ble_advertising_start(void)
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-    NRF_LOG_DEBUG("Advertising Init");
-    #endif
-}
 
+    NRF_LOG_INFO("Advertising Init");
+}
 
 /**@brief Function for handling BLE events.
  *
  * @param[in]   p_ble_evt   Bluetooth stack event.
  * @param[in]   p_context   Unused.
  */
-static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
+static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 {
-  
 
     switch (p_ble_evt->header.evt_id)
     {
-        case BLE_GAP_EVT_CONNECTED:
-            #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-            NRF_LOG_INFO("Connected");
-            #endif
-            bsp_board_led_on(CONNECTED_LED);
-            bsp_board_led_off(ADVERTISING_LED);
-            m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
-          nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
-            
-            
-            break;
+    case BLE_GAP_EVT_CONNECTED:
 
-        case BLE_GAP_EVT_DISCONNECTED:
-            #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-            NRF_LOG_INFO("Disconnected");
-            #endif
-            bsp_board_led_off(CONNECTED_LED);
-            m_conn_handle = BLE_CONN_HANDLE_INVALID;
-            // err_code = app_button_disable();
-            // APP_ERROR_CHECK(err_code);
-            ble_advertising_start();
-            break;
+        NRF_LOG_INFO("Connected");
+
+        bsp_board_led_on(CONNECTED_LED);
+        bsp_board_led_off(ADVERTISING_LED);
+        m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+        sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
+        nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
+
+        break;
+
+    case BLE_GAP_EVT_DISCONNECTED:
+
+        NRF_LOG_INFO("Disconnected");
+
+        bsp_board_led_off(CONNECTED_LED);
+        m_conn_handle = BLE_CONN_HANDLE_INVALID;
+        // err_code = app_button_disable();
+        // APP_ERROR_CHECK(err_code);
+        ble_advertising_start();
+        break;
 
         // case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
         //     // Pairing not supported
@@ -441,7 +398,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
         // {
-        //     NRF_LOG_DEBUG("PHY update request.");
+        //     NRF_LOG_INFO("PHY update request.");
         //     ble_gap_phys_t const phys =
         //     {
         //         .rx_phys = BLE_GAP_PHY_AUTO,
@@ -459,7 +416,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GATTC_EVT_TIMEOUT:
         //     // Disconnect on GATT Client timeout event.
-        //     NRF_LOG_DEBUG("GATT Client Timeout.");
+        //     NRF_LOG_INFO("GATT Client Timeout.");
         //     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
         //                                      BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         //     APP_ERROR_CHECK(err_code);
@@ -467,7 +424,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         // case BLE_GATTS_EVT_TIMEOUT:
         //     // Disconnect on GATT Server timeout event.
-        //     NRF_LOG_DEBUG("GATT Server Timeout.");
+        //     NRF_LOG_INFO("GATT Server Timeout.");
         //     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
         //                                      BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         //     APP_ERROR_CHECK(err_code);
@@ -494,15 +451,11 @@ static void ble_stack_init(void)
     // Register a handler for BLE events.
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
 
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-        NRF_LOG_DEBUG("BLE Stack INIT");
-    #endif
+    NRF_LOG_INFO("BLE Stack INIT");
 }
 
-
-
 /**@brief Function which writes a value to the characteristic mentioned
- * 
+ *
  * @param  characteristic_value [in] Value being written to the characteristic
  * @param char_handle [in] handle of the characteristic
  */
@@ -519,14 +472,16 @@ void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_ha
 }
 
 /**@brief Funtion for the button handler that uses interrupts to check if a button has been pushed
- * 
+ *
  * @param pin [in] variable which holds the button which the handler is handling
  * @param action [in] variable which stores the action which the button is doing.
  */
 static void button_handler(uint8_t pin, uint8_t action)
 {
-    if(pin == BSP_BUTTON_0){
-        if(action == APP_BUTTON_PUSH){
+    if (pin == BSP_BUTTON_0)
+    {
+        if (action == APP_BUTTON_PUSH)
+        {
             bsp_board_led_on(BSP_BOARD_LED_0);
         }
         else if (action == APP_BUTTON_RELEASE)
@@ -534,7 +489,6 @@ static void button_handler(uint8_t pin, uint8_t action)
             bsp_board_led_off(BSP_BOARD_LED_0);
         }
         ble_write_to_characteristic(action, voltage_char_handles);
-        
     }
 }
 
@@ -542,27 +496,19 @@ static void button_handler(uint8_t pin, uint8_t action)
  */
 static void button_init(void)
 {
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_DEBUG
-        NRF_LOG_DEBUG("Button INIT");
-    #endif
+
+    NRF_LOG_DEBUG("Button INIT");
+
     nrf_sdh_enable_request();
-    static app_button_cfg_t buttons[] ={
-        {BSP_BUTTON_0, false, BUTTON_PULL, button_handler}
-    };
+    static app_button_cfg_t buttons[] = {
+        {BSP_BUTTON_0, false, BUTTON_PULL, button_handler}};
     app_button_init(buttons, ARRAY_SIZE(buttons), APP_TIMER_TICKS(50));
     app_button_enable();
 }
 
-/**@brief Function collecting a sample from the GPIO pins
- */
-/**
- * @brief Not used in this example, but driver API requiers a callback function to be proivded.
- */
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
 }
-
-
 /**
  * @brief Function for confguring SAADC channel 0 for sampling AIN0 (P0.02).
  */
@@ -614,7 +560,6 @@ static void log_init(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
-
 // /**@brief Function for initializing power management.
 //  */
 // static void power_management_init(void)
@@ -623,7 +568,6 @@ static void log_init(void)
 //     err_code = nrf_pwr_mgmt_init();
 //     APP_ERROR_CHECK(err_code);
 // }
-
 
 // /**@brief Function for handling the idle state (main loop).
 //  *
@@ -637,15 +581,141 @@ static void log_init(void)
 //     }
 // }
 
+static void timer_init()
+{
+    NVIC_EnableIRQ(TIMER1_IRQn);
+    NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
+    nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
+
+    NRF_TIMER1->TASKS_STOP = 1;
+    NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
+    NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
+    NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
+
+    NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+
+    NRF_TIMER1->TASKS_CLEAR = 1;
+    NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+
+    NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+
+    NRF_LOG_DEBUG("Timer1 setup");
+}
+static void counter_init()
+{
+    NRF_TIMER2->TASKS_STOP = 1;
+    NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
+    NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+    NRF_TIMER2->TASKS_CLEAR = 1;
+    NRF_TIMER2->EVENTS_COMPARE[0] = 0;
+
+    NRF_LOG_DEBUG("Timer2 setup");
+}
+static void setup_gpiote_event(uint32_t pin)
+{
+    NRF_GPIOTE->CONFIG[0] = 0x01 << 0;                         // MODE: Event
+    NRF_GPIOTE->CONFIG[0] |= pin << 8;                         // Pin number
+    NRF_GPIOTE->CONFIG[0] |= NRF_GPIOTE_POLARITY_LOTOHI << 16; // Event rising edge
+
+    NRF_LOG_DEBUG("gpiote_init rising edge");
+
+    NRF_GPIOTE->CONFIG[1] = 0x01 << 0;                         // MODE: Event
+    NRF_GPIOTE->CONFIG[1] |= pin << 8;                         // Pin number
+    NRF_GPIOTE->CONFIG[1] |= NRF_GPIOTE_POLARITY_HITOLO << 16; // Event rising edge
+
+    NRF_LOG_DEBUG("gpiote_init_falling edge");
+}
+
+static void setup_timer_and_counter_ppi()
+{
+    NRF_PPI->CHEN |= 1 << 1;
+    *(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
+    *(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
+    *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
+    NRF_PPI->CHENSET |= 1 << 1;
+
+    NRF_LOG_DEBUG("ppi_gpiote_counter_init_rising");
+
+    NRF_PPI->CHEN |= 1 << 2;
+    *(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
+    *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[3];
+    NRF_PPI->CHENSET |= 1 << 2;
+
+    NRF_LOG_DEBUG("ppi_gpiote_counter_init_falling");
+
+    NRF_PPI->CHEN |= 1 << 0;
+    *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
+    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_STOP;
+    NRF_PPI->CHENSET |= 1 << 0;
+
+    NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
+}
+
+uint8_t valid_temp_counter = 0;
+double valid_duty_cycle[80];
+
+void TIMER1_IRQHandler(void)
+{
+    if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
+    {
+        NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+        NRF_TIMER2->TASKS_STOP;
+
+        int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
+
+        if ((pulse_width) < 0)
+        {
+            NRF_TIMER1->TASKS_CLEAR = 1;
+            NRF_TIMER2->TASKS_CLEAR = 1;
+
+            NRF_TIMER1->TASKS_START = 1;
+            NRF_TIMER2->TASKS_START = 1;
+        }
+        else
+        {
+            uint16_t frequency = NRF_TIMER2->CC[0] * 4 * 100;
+            double duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
+            NRF_TIMER1->TASKS_CLEAR = 1;
+            NRF_TIMER2->TASKS_CLEAR = 1;
+
+            if (valid_temp_counter == 80)
+            {
+                NRF_LOG_INFO("cc: %dHz", frequency);
+                frequency = 6124;
+                double average_duty_cycle = 0;
+                for (uint8_t i = 0; i < 80; i++)
+                {
+                    average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
+                }
+                average_duty_cycle = average_duty_cycle / 80;
+                NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
+                double temperature = -1.43 * pow(average_duty_cycle, 2) + 214.56 * average_duty_cycle - 68.60;
+                NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
+                valid_temp_counter = 0;
+
+            }
+            else
+            {
+                valid_duty_cycle[valid_temp_counter] = duty_cycle;
+                valid_temp_counter += 1;
+
+                NRF_TIMER1->TASKS_START = 1;
+                NRF_TIMER2->TASKS_START = 1;
+            }
+        }
+    }
+}
+
 /**@brief Function for application main entry.
  */
 int main(void)
 {
     // Initialize.
     log_init();
-    #if defined(LOG_LEVEL) && LOG_LEVEL == LOG_LEVEL_INFO
-        NRF_LOG_INFO("Program Start");
-    #endif
+    NRF_LOG_FLUSH();
+    NRF_LOG_INFO("Program Start!!!!");
+    NRF_LOG_FLUSH();
     // power_management_init();
     leds_init();
     timers_init();
@@ -657,19 +727,32 @@ int main(void)
     ble_services_init();
     ble_advertising_init();
     ble_connection_params_init();
+
+
+    // temp sensor code
+    timer_init();
+    counter_init();
+    setup_gpiote_event(FREQ_MEASURE_PIN);
+    setup_timer_and_counter_ppi();
+
+
+    NRF_TIMER1->TASKS_START = 1;
+    NRF_TIMER2->TASKS_START = 1;
+
+
     // Start execution.
     ret_code_t err_code;
     nrf_saadc_value_t sample;
-
     saadc_init();
     ble_advertising_start();
-    sd_ble_gap_adv_stop(m_adv_handle);
+
+
 
     for(;;)
     {
         err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
         APP_ERROR_CHECK(err_code);
-
+        
         double V = (double)(((sample * 1.2) / (4095)) * 3);
         NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
         // NRF_LOG_INFO("sample: %d", V);
@@ -678,6 +761,6 @@ int main(void)
         // bsp_board_led_on(LEDBUTTON_LED);
         nrf_delay_ms(300);
         // bsp_board_led_off(LEDBUTTON_LED);
-        // nrf_delay_ms(5000);
+        // nrf_delay_us(3000);        
     }
 }
