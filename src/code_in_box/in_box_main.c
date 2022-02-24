@@ -453,13 +453,13 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
     uint8_t data[2] = { int_val, dec_val};
         NRF_LOG_DEBUG("Writing the following values to the characteristic %d and %d", data[0], data[1]);
 
-    uint16_t len = sizeof(int_val);
+    uint16_t len = sizeof(data);
     memset(&params, 0, sizeof(params));
     params.type = BLE_GATT_HVX_NOTIFICATION;
     params.handle = char_handle.value_handle;
 
     params.p_data = &data[1];
-    params.p_data = &int_val;
+    params.p_data = &dec_val;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
@@ -628,7 +628,7 @@ static int exponent_part(double num){
 }
 
 uint16_t valid_temp_counter = 0;
-#define num_periods 255
+#define num_periods 1000
 double valid_duty_cycle[num_periods];
 uint16_t frequency = 0;
 double duty_cycle = 0;
@@ -676,25 +676,8 @@ void TIMER1_IRQHandler(void)
                 int expo = exponent_part(temperature);
                 temperature_encoded = decimal_part(temperature);
                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
-                uint8_t data[2] = {temperature_encoded, expo};
-                (void) data;
                 ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
-
-
-                // ble_gatts_hvx_params_t params;
-                // uint16_t len = sizeof(data);
-                // memset(&params, 0, sizeof(params));
-                // params.type = BLE_GATT_HVX_NOTIFICATION;
-                // params.handle = temperature_1_char_handles.value_handle;
-
-                // // params.p_data = data;
-
-                // params.p_len = &len;
-                // ret_code_t err_code = sd_ble_gatts_hvx(m_conn_handle, &params);
-                // APP_ERROR_CHECK(err_code);
-
-
-                nrf_delay_ms(5000);
+                nrf_delay_ms(15000);
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
