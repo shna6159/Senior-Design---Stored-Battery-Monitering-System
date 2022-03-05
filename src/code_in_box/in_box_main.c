@@ -34,8 +34,10 @@
 #include "nrf_gpio.h"
 #include "nrf_drv_gpiote.h"
 
-#define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0, 11)
-#define output_pin NRF_GPIO_PIN_MAP(0, 12)
+#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(1, 15)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(1, 13)
+
+#define output_pin NRF_GPIO_PIN_MAP(0, 22)
 
 #define TX_POWER_LEVEL 8
 
@@ -543,7 +545,7 @@ static void timer_init()
 {
     NVIC_EnableIRQ(TIMER1_IRQn);
     NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
-    nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
+    nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
 
     NRF_TIMER1->TASKS_STOP = 1;
     NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
@@ -634,6 +636,7 @@ uint16_t frequency = 0;
 double duty_cycle = 0;
 double temperature;
 uint16_t temperature_encoded;
+bool temp_sensor = false;
 
 void TIMER1_IRQHandler(void)
 {
@@ -676,8 +679,22 @@ void TIMER1_IRQHandler(void)
                 int expo = exponent_part(temperature);
                 temperature_encoded = decimal_part(temperature);
                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
-                ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
-                nrf_delay_ms(15000);
+                
+
+                if(temp_sensor == false){
+                    ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
+                    temp_sensor = true;
+                    setup_gpiote_event(TEMP_SENSOR_2);
+                    setup_timer_and_counter_ppi();
+                }
+                else{
+                    ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
+                    temp_sensor = false;
+                    setup_gpiote_event(TEMP_SENSOR_1);
+                    setup_timer_and_counter_ppi();
+                }
+
+                nrf_delay_ms(10000);
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
@@ -714,11 +731,14 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
-
+    nrf_gpio_cfg_output(output_pin);
+    nrf_gpio_pin_set(output_pin);
     // temp sensor code
+
+
     timer_init();
     counter_init();
-    setup_gpiote_event(FREQ_MEASURE_PIN);
+    setup_gpiote_event(TEMP_SENSOR_1);
     setup_timer_and_counter_ppi();
 
 
