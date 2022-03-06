@@ -40,9 +40,9 @@
 
 
 #define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(0, 11)
-#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 11)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 12)
 
-#define output_pin NRF_GPIO_PIN_MAP(0, 12)
+#define output_pin NRF_GPIO_PIN_MAP(0, 13)
 #define NUM_TEMPERATURE_PERIODS 1000
 
 
@@ -76,72 +76,84 @@ int expo;
 //                                      PROCEDURES - TEMP SENSOR
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
+static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
+{
+int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
+NRF_LOG_INFO("pulse_width %d", pulse_width);
+NRF_LOG_INFO("pulse_width %d", NRF_TIMER1->CC[3]);
+NRF_LOG_INFO("pulse_width %d", NRF_TIMER1->CC[2]);
+NRF_LOG_INFO("pulse_width %d", NRF_TIMER1->CC[1]);
+NRF_LOG_INFO("pulse_width %d", NRF_TIMER1->CC[0]);
+NRF_LOG_INFO("pulse_width %d", NRF_TIMER2->CC[0]);
+
+}
+/* Timer event handler. Not used since Timer1 and Timer2 are used only for PPI. */
+static void empty_timer_handler(nrf_timer_event_t event_type, void * p_context)
+{
+}
+
+
 static void timer_init()
 {
-    // nrf_gpio_cfg_output(output_pin);
-    // // nrf_gpio_pin_set(output_pin);
-
-    // NVIC_EnableIRQ(TIMER1_IRQn);
-    // NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
-    // nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
-
-    // NRF_TIMER1->TASKS_STOP = 1;
-    // NRF_TIMER1->TASKS_CLEAR = 1;
-    // NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-    // NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
-    // NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
-
-    // NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
-
-    // NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
-
-    // NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-    
+   
     nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
     timer_cfg.frequency = NRF_TIMER_FREQ_16MHz;
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
 
-    ret_code_t err_code = nrf_drv_timer_init(&m_timer0, &timer_cfg, timer0_event_handler);
+    ret_code_t err_code = nrf_drv_timer_init(&m_timer1, &timer_cfg, timer1_event_handler);
     APP_ERROR_CHECK(err_code);
 
-    nrf_drv_timer_extended_compare(&m_timer0,
+    nrf_drv_timer_extended_compare(&m_timer1,
                                    NRF_TIMER_CC_CHANNEL0,
-                                   nrf_drv_timer_ms_to_ticks(&m_timer1,
-                                                             40000),
+                                   40000,
                                    NRF_TIMER_SHORT_COMPARE0_STOP_MASK,
                                    true);
 
-    NRF_LOG_DEBUG("Timer1 setup");
+    NRF_LOG_DEBUG("Timer1 timer mode setup");
 }
-
 static void counter_init()
 {
-    // NRF_TIMER2->TASKS_STOP = 1;
-    // NRF_TIMER1->TASKS_CLEAR = 1;
-    // NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
-    // NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
-    // NRF_TIMER2->TASKS_CLEAR = 1;
     nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
-    timer_cfg.frequency = NRF_TIMER_FREQ_16MHz;
+    timer_cfg.mode = TIMER_MODE_MODE_Counter;
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
-
-
-    NRF_LOG_DEBUG("Timer2 setup");
+    ret_code_t err_code = nrf_drv_timer_init(&m_timer2, &timer_cfg, empty_timer_handler);
+    
+    APP_ERROR_CHECK(err_code);
+    NRF_LOG_DEBUG("Timer2 counter mode setup");
 }
-static void setup_gpiote_event(uint32_t pin)
+
+static void gpiote_event_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
-    NRF_GPIOTE->CONFIG[0] = 0x01 << 0;                         // MODE: Event
-    NRF_GPIOTE->CONFIG[0] |= pin << 8;                         // Pin number
-    NRF_GPIOTE->CONFIG[0] |= NRF_GPIOTE_POLARITY_LOTOHI << 16; // Event rising edge
+// empty handler
+}
 
-    NRF_LOG_DEBUG("gpiote_init rising edge");
+uint32_t event_address_rising;
+uint32_t event_address_falling;
 
-    NRF_GPIOTE->CONFIG[1] = 0x01 << 0;                         // MODE: Event
-    NRF_GPIOTE->CONFIG[1] |= pin << 8;                         // Pin number
-    NRF_GPIOTE->CONFIG[1] |= NRF_GPIOTE_POLARITY_HITOLO << 16; // Event rising edge
+static void setup_gpiote_event()
+{
+
+    uint32_t err_code = nrf_drv_gpiote_init();
+    nrf_drv_gpiote_in_config_t config = GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
+
+    err_code = nrf_drv_gpiote_in_init(TEMP_SENSOR_1, &config, gpiote_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    event_address_rising = nrf_drv_gpiote_in_event_addr_get(TEMP_SENSOR_1);
+
+        NRF_LOG_DEBUG("gpiote_init rising edge");
+
+    nrf_drv_gpiote_in_config_t config1 = GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
+    err_code = nrf_drv_gpiote_in_init(TEMP_SENSOR_2, &config1, gpiote_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    event_address_falling = nrf_drv_gpiote_in_event_addr_get(TEMP_SENSOR_2);
 
     NRF_LOG_DEBUG("gpiote_init_falling edge");
+
+
 }
+
 
 static void setup_timer_and_counter_ppi()
 {
@@ -155,129 +167,82 @@ static void setup_timer_and_counter_ppi()
     err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel1);
     APP_ERROR_CHECK(err_code);
 
-    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel1,
-                                        nrf_drv_timer_event_address_get(&m_timer1,
-                                                                        NRF_TIMER_EVENT_COMPARE0),
-                                        nrf_drv_timer_task_address_get(&m_timer0,
-                                                                        NRF_TIMER_TASK_STOP));
+    uint32_t timer2_capture0 = nrf_drv_timer_capture_task_address_get(&m_timer2,NRF_TIMER_TASK_CAPTURE0);
+    uint32_t timer1_compare0 =  nrf_drv_timer_event_address_get(&m_timer1,NRF_TIMER_EVENT_COMPARE0);
+
+    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel1,timer1_compare0, timer2_capture0);
+    APP_ERROR_CHECK(err_code);
+
+
+    uint32_t task_address_counter_increment = nrf_drv_timer_task_address_get(&m_timer2, NRF_TIMER_TASK_COUNT);
+    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel2);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel2, event_address_rising, task_address_counter_increment);
+    APP_ERROR_CHECK(err_code);
+
+
+    uint32_t timer1_capture2 = nrf_drv_timer_capture_task_address_get(&m_timer1,NRF_TIMER_TASK_CAPTURE2);
+    err_code = nrf_drv_ppi_channel_fork_assign(m_ppi_channel2, timer1_capture2);
+    APP_ERROR_CHECK(err_code); 
+
+
+
+    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel3);
+    APP_ERROR_CHECK(err_code);  
+
+    uint32_t timer1_capture3 = nrf_drv_timer_capture_task_address_get(&m_timer1,NRF_TIMER_TASK_CAPTURE3);
+    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel3, event_address_falling, timer1_capture3);
+    APP_ERROR_CHECK(err_code);
+
+
+
+    
+    uint32_t timer2_stop = nrf_drv_timer_task_address_get(&m_timer2,NRF_TIMER_TASK_STOP);
+    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel4);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel4, timer1_compare0, timer2_stop);
+    APP_ERROR_CHECK(err_code);
+
+
+    err_code = nrf_drv_ppi_channel_enable(m_ppi_channel1);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_enable(m_ppi_channel2);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_enable(m_ppi_channel3);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_enable(m_ppi_channel4);
+    APP_ERROR_CHECK(err_code);
+
+
+    nrf_drv_gpiote_in_event_enable(TEMP_SENSOR_1, true);
+    nrf_drv_gpiote_in_event_enable(TEMP_SENSOR_2, true);
 }
 
-nrf_gpiote_event_addr_get
-
-static int decimal_part(double num){
-  int intpart = (int)num;
-  double decpart = num - intpart;
-  int decimal = decpart*100;
-  NRF_LOG_DEBUG("decimal part is %d", decimal);
-  return decimal;
-}
-
-static int exponent_part(double num){
-    int intpart = (int)num;
-      NRF_LOG_DEBUG("int part is %d", intpart);
-    return intpart;
-}
-
-static void temp_sensor_measure(void){
-    NRF_TIMER1->TASKS_START = 1;
-    NRF_TIMER2->TASKS_START = 1;
-}
 
 
-static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
-{
-    ++m_counter;
-}
-/* Timer event handler. Not used since Timer1 and Timer2 are used only for PPI. */
-static void empty_timer_handler(nrf_timer_event_t event_type, void * p_context)
-{
-}
 
-// void TIMER1_IRQHandler(void)
-// {
-//     if (NRF_TIMER1->EVENTS_COMPARE[0] == 1)
-//     {
-//         NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-
-//         int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
-
-
-//         if ((pulse_width) < 0)
-//         {
-//             NRF_TIMER1->TASKS_CLEAR = 1;
-//             NRF_TIMER2->TASKS_CLEAR = 1;
-
-//             NRF_TIMER2->CC[0] = 0;
-//             NRF_TIMER1->CC[2] = 0;
-//             NRF_TIMER1->CC[3] = 0;
-
-//             NRF_TIMER1->TASKS_START = 1;
-//             NRF_TIMER2->TASKS_START = 1;
-//         }
-//         else
-//         {
-//             frequency = NRF_TIMER2->CC[0] * 4 * 100;
-//             duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
-//             NRF_TIMER1->TASKS_CLEAR = 1;
-//             NRF_TIMER2->TASKS_CLEAR = 1;
-//             if (valid_temp_counter == NUM_TEMPERATURE_PERIODS)
-//             {
-
-//                 double average_duty_cycle = 0;
-//                 for (uint16_t i = 0; i < NUM_TEMPERATURE_PERIODS; i++)
-//                 {
-//                     average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
-//                 }
-//                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
-//                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-//                 temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
-//                 valid_temp_counter = 0;
-
-//                 expo = exponent_part(temperature);
-//                 temperature_encoded = decimal_part(temperature);
-//                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r", NRF_LOG_FLOAT(temperature));
-                
-
-//                 if(temp_sensor == false){
-//                     // ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
-//                     temp_sensor = true;
-//                     setup_gpiote_event(TEMP_SENSOR_2);
-
-//                     NRF_TIMER2->CC[0] = 0;
-//                     NRF_TIMER1->CC[2] = 0;
-//                     NRF_TIMER1->CC[3] = 0;
-//                     NRF_TIMER1->TASKS_START = 1;
-//                     NRF_TIMER2->TASKS_START = 1;
-//                 }
-//                 else{
-//                     // ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
-//                     temp_sensor = false;
-                    
-//                     NRF_TIMER2->CC[0] = 0;
-//                     NRF_TIMER1->CC[2] = 0;
-//                     NRF_TIMER1->CC[3] = 0;
-
-//                     temp_sensor_measure();
-//                 }
-                
-//                 // nrf_delay_ms(10000);
-//                 // NRF_TIMER1->TASKS_START = 1;
-//                 // NRF_TIMER2->TASKS_START = 1;
-//             }
-//             else
-//             {
-//                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
-//                 valid_temp_counter += 1;
-                
-//                 NRF_TIMER2->CC[0] = 0;
-//                 NRF_TIMER1->CC[2] = 0;
-//                 NRF_TIMER1->CC[3] = 0;
-//                 NRF_TIMER1->TASKS_START = 1;
-//                 NRF_TIMER2->TASKS_START = 1;
-//             }
-//         }
-//     }
+// static int decimal_part(double num){
+//   int intpart = (int)num;
+//   double decpart = num - intpart;
+//   int decimal = decpart*100;
+//   NRF_LOG_DEBUG("decimal part is %d", decimal);
+//   return decimal;
 // }
+
+// static int exponent_part(double num){
+//     int intpart = (int)num;
+//       NRF_LOG_DEBUG("int part is %d", intpart);
+//     return intpart;
+// }
+
+// static void temp_sensor_measure(void){
+//     NRF_TIMER1->TASKS_START = 1;
+//     NRF_TIMER2->TASKS_START = 1;
+// }
+
+
+
+
 
 
 //------------------------------------------------------------------------------------------
@@ -323,12 +288,10 @@ int main(void)
     
     timer_init();
     counter_init();
-    setup_gpiote_event(TEMP_SENSOR_1);
+    setup_gpiote_event();
     setup_timer_and_counter_ppi();
-    temp_sensor_measure();
-
-    temp_sensor_measure();
-
+    nrf_drv_timer_enable(&m_timer1);
+    nrf_drv_timer_enable(&m_timer2);
 
     // Sleep in the while loop until an event is generated
     while (true)
