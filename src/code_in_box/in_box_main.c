@@ -752,7 +752,7 @@ int main(void)
     // saadc_init();
     ble_advertising_start();
 
-
+// Setting up the RTC
 
     for(;;)
     {
