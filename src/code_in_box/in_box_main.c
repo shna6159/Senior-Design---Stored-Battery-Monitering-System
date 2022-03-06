@@ -51,7 +51,6 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         bsp_board_led_invert(UNEXPECTED_LED);
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
         nrf_drv_rtc_cc_set(&rtc,0,COMPARE_COUNTERTIME * 8,true);
-        // nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_START);
     }
     else
     {
