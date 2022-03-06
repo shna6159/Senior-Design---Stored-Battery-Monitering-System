@@ -20,6 +20,10 @@
 #include "nrf_pwr_mgmt.h"
 #include "nrf_delay.h"
 
+
+#include "nrf_drv_clock.h"
+#include "nrf_drv_rtc.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include "nrf_drv_saadc.h"
@@ -34,10 +38,15 @@
 #include "nrf_gpio.h"
 #include "nrf_drv_gpiote.h"
 
-#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(1, 15)
-#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(1, 13)
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      DEFINES
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(0, 11)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 11)
 
-#define output_pin NRF_GPIO_PIN_MAP(0, 22)
+#define output_pin NRF_GPIO_PIN_MAP(0, 12)
 
 #define TX_POWER_LEVEL 8
 
@@ -80,6 +89,21 @@
 #define UUID_VOLTAGE_CHAR 0x1234
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
+// RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
+#define RTC_VAL_IN_SEC  (10UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define NUM_TEMPERATURE_PERIODS 1000
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      LITERAL CONSTS
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+const nrf_drv_rtc_t rtc = NRFX_RTC_INSTANCE(2); // Create a handle that will point to the RTC 2 of nrf device
 
 NRF_BLE_GATT_DEF(m_gatt); /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);   /**< Context for the Queued Write module.*/
@@ -108,34 +132,33 @@ static ble_gap_adv_data_t m_adv_data =
 
             }};
 
-// /**@brief Function for assert macro callback.
-//  *
-//  * @details This function will be called in case of an assert in the SoftDevice.
-//  *
-//  * @warning This handler is an example only and does not fit a final product. You need to analyze
-//  *          how your product is supposed to react in case of Assert.
-//  * @warning On assert from the SoftDevice, the system can only recover on reset.
-//  *
-//  * @param[in] line_num    Line number of the failing ASSERT call.
-//  * @param[in] p_file_name File name of the failing ASSERT call.
-//  */
-// void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
-// {
-//     app_error_handler(DEAD_BEEF, line_num, p_file_name);
-// }
-
-/*
-Descripttion : Sets up all the the LEDs used by the program
-*/
-static void leds_init(void)
-{
-    NRF_LOG_DEBUG("LED init");
-
-    bsp_board_init(BSP_INIT_LEDS);
-}
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 
 
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      GLOBAL VARIABLES
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+uint16_t valid_temp_counter = 0;
+double valid_duty_cycle[NUM_TEMPERATURE_PERIODS];
+uint16_t frequency = 0;
+double duty_cycle = 0;
+double temperature;
+uint16_t temperature_encoded;
+bool temp_sensor = false;
+int expo;
 
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - BLE
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 /**@brief Function for the GAP initialization.
  *
  * @details This function sets up all the necessary GAP (Generic Access Profile) parameters of the
@@ -340,7 +363,7 @@ static void ble_advertising_start(void)
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
 
-    NRF_LOG_INFO("Advertising Init");
+    NRF_LOG_INFO("Advertising Init \n\n");
 }
 
 /**@brief Function for handling BLE events.
@@ -453,7 +476,7 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
 {
     ble_gatts_hvx_params_t params;
     uint8_t data[2] = { int_val, dec_val};
-        NRF_LOG_DEBUG("Writing the following values to the characteristic %d and %d", data[0], data[1]);
+        NRF_LOG_DEBUG("Writing the following values to the characteristic %d and %d \n", data[0], data[1]);
 
     uint16_t len = sizeof(data);
     memset(&params, 0, sizeof(params));
@@ -466,6 +489,15 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
 
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - SAADC
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
 }
@@ -510,51 +542,32 @@ void saadc_init(void)
     nrf_drv_saadc_calibrate_offset();
 }
 
-/**@brief Function for setting up logs.
- */
-static void log_init(void)
-{
-    ret_code_t err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-}
 
-// /**@brief Function for initializing power management.
-//  */
-// static void power_management_init(void)
-// {
-//     ret_code_t err_code;
-//     err_code = nrf_pwr_mgmt_init();
-//     APP_ERROR_CHECK(err_code);
-// }
-
-// /**@brief Function for handling the idle state (main loop).
-//  *
-//  * @details If there is no pending log operation, then sleep until next the next event occurs.
-//  */
-// static void idle_state_handle(void)
-// {
-//     if (NRF_LOG_PROCESS() == false)
-//     {
-//         nrf_pwr_mgmt_run();
-//     }
-// }
-
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - TEMP SENSOR
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 static void timer_init()
 {
+    nrf_gpio_cfg_output(output_pin);
+    // nrf_gpio_pin_set(output_pin);
+
     NVIC_EnableIRQ(TIMER1_IRQn);
     NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
     nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
 
     NRF_TIMER1->TASKS_STOP = 1;
+    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
     NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
     NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
 
     NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
 
-    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
 
     NRF_TIMER1->EVENTS_COMPARE[0] = 0;
@@ -564,10 +577,10 @@ static void timer_init()
 static void counter_init()
 {
     NRF_TIMER2->TASKS_STOP = 1;
+    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
     NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
     NRF_TIMER2->TASKS_CLEAR = 1;
-    NRF_TIMER2->EVENTS_COMPARE[0] = 0;
 
     NRF_LOG_DEBUG("Timer2 setup");
 }
@@ -613,6 +626,14 @@ static void setup_timer_and_counter_ppi()
     NRF_PPI->CHENSET |= 1 << 2;
 
     NRF_LOG_DEBUG("ppi_gpiote_counter_init_falling");
+
+    NRF_PPI->CHEN |= 1 << 3;
+    *(&(NRF_PPI->CH3_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH3_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
+    NRF_PPI->CHENSET |= 1 << 3;
+
+    NRF_LOG_DEBUG("Setting up the ppi for timer pin high"); // TODO: remove this
+
 }
 
 static int decimal_part(double num){
@@ -629,18 +650,8 @@ static int exponent_part(double num){
     return intpart;
 }
 
-uint16_t valid_temp_counter = 0;
-#define num_periods 1000
-double valid_duty_cycle[num_periods];
-uint16_t frequency = 0;
-double duty_cycle = 0;
-double temperature;
-uint16_t temperature_encoded;
-bool temp_sensor = false;
-
 void TIMER1_IRQHandler(void)
 {
-    NRF_TIMER2->TASKS_STOP;
     if (NRF_TIMER1->EVENTS_COMPARE[0] == 1)
     {
         NRF_TIMER1->EVENTS_COMPARE[0] = 0;
@@ -653,6 +664,10 @@ void TIMER1_IRQHandler(void)
             NRF_TIMER1->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
 
+            NRF_TIMER2->CC[0] = 0;
+            NRF_TIMER1->CC[2] = 0;
+            NRF_TIMER1->CC[3] = 0;
+
             NRF_TIMER1->TASKS_START = 1;
             NRF_TIMER2->TASKS_START = 1;
         }
@@ -663,47 +678,56 @@ void TIMER1_IRQHandler(void)
             duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
             NRF_TIMER1->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
-            if (valid_temp_counter == num_periods)
+            if (valid_temp_counter == NUM_TEMPERATURE_PERIODS)
             {
 
                 double average_duty_cycle = 0;
-                for (uint16_t i = 0; i < num_periods; i++)
+                for (uint16_t i = 0; i < NUM_TEMPERATURE_PERIODS; i++)
                 {
                     average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
                 }
-                average_duty_cycle = average_duty_cycle / num_periods;
+                average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
                 temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
                 valid_temp_counter = 0;
 
-                int expo = exponent_part(temperature);
+                expo = exponent_part(temperature);
                 temperature_encoded = decimal_part(temperature);
-                NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
+                NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r", NRF_LOG_FLOAT(temperature));
                 
 
                 if(temp_sensor == false){
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
                     temp_sensor = true;
                     setup_gpiote_event(TEMP_SENSOR_2);
-                    setup_timer_and_counter_ppi();
+
+                    NRF_TIMER2->CC[0] = 0;
+                    NRF_TIMER1->CC[2] = 0;
+                    NRF_TIMER1->CC[3] = 0;
+                    NRF_TIMER1->TASKS_START = 1;
+                    NRF_TIMER2->TASKS_START = 1;
                 }
                 else{
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     temp_sensor = false;
-                    setup_gpiote_event(TEMP_SENSOR_1);
-                    setup_timer_and_counter_ppi();
+                    
+                    NRF_TIMER2->CC[0] = 0;
+                    NRF_TIMER1->CC[2] = 0;
+                    NRF_TIMER1->CC[3] = 0;
                 }
 
-                nrf_delay_ms(10000);
-                NRF_TIMER1->TASKS_START = 1;
-                NRF_TIMER2->TASKS_START = 1;
+                // nrf_delay_ms(10000);
+                // NRF_TIMER1->TASKS_START = 1;
+                // NRF_TIMER2->TASKS_START = 1;
             }
             else
             {
                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
                 valid_temp_counter += 1;
                 
-
+                NRF_TIMER2->CC[0] = 0;
+                NRF_TIMER1->CC[2] = 0;
+                NRF_TIMER1->CC[3] = 0;
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
@@ -711,18 +735,140 @@ void TIMER1_IRQHandler(void)
     }
 }
 
-/**@brief Function for application main entry.
+static void temp_sensor_measure(void){
+    NRF_TIMER1->TASKS_START = 1;
+    NRF_TIMER2->TASKS_START = 1;
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - REAL TIME COUNTER
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+// static void lfclk_config(void)
+// {
+//     // Initialize the low frequency clock
+//     ret_code_t err_code = nrf_drv_clock_init();
+//     APP_ERROR_CHECK(err_code); // check for the errors
+
+//     // Request the clock to not to generate events
+//     nrf_drv_clock_lfclk_request(NULL);
+//     NRF_LOG_DEBUG("Low frequency clock setup");
+// }
+
+// RTC interrupt handler which will be used to handle the interrupt events
+static void rtc_handler(nrfx_rtc_int_type_t int_type)
+{
+
+    // Check if the interrupt occurred due to tick event
+    if (int_type == NRF_DRV_RTC_INT_TICK)
+    {
+        // perform some action
+        bsp_board_led_invert(ADVERTISING_LED);
+    }
+    else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
+    {
+        NRF_LOG_DEBUG("RTC compare event");
+        bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
+
+        // temp sensor code
+        timer_init();
+        counter_init();
+        setup_gpiote_event(TEMP_SENSOR_1);
+        setup_timer_and_counter_ppi();
+        temp_sensor_measure();
+
+
+        // ble_advertising_start();
+
+        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+    }
+    else
+    {
+        // default action
+        // leave it empty
+    }
+}
+
+// A function to configure and intialize the RTC
+static void rtc_config(void)
+{
+
+    uint32_t err_code; // a variable to hold the error values
+
+    // Create a struct of type nrfx_rtc_config_t and assign it default values
+    nrf_drv_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+
+    // Configure the prescaler to generate ticks for a specific time unit
+    // Configured it to tick every 125ms
+    rtc_config.prescaler = 4095; // tick =  32768 / (4095 + 1) = 8Hz = 125ms
+
+    // Initialize the rtc and pass the configurations along with the interrupt handler
+    err_code = nrf_drv_rtc_init(&rtc, &rtc_config, rtc_handler);
+    APP_ERROR_CHECK(err_code); // check for errors
+
+    // Generate a tick event on each tick
+    // nrf_drv_rtc_tick_enable(&rtc, true);
+
+    err_code = nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+    APP_ERROR_CHECK(err_code);
+
+    // start the rtc
+    NRF_LOG_DEBUG("RTC config");
+}
+
+static void rtc_start(void){
+    nrf_drv_rtc_enable(&rtc);
+    NRF_LOG_DEBUG("RTC start");
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - MISC
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+/*
+Descripttion : Sets up all the the LEDs used by the program
+*/
+static void leds_init(void)
+{
+    NRF_LOG_DEBUG("LED init");
+
+    bsp_board_init(BSP_INIT_LEDS);
+}
+
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+
+
+/**
+ * @brief Function for application main entry.
  */
 int main(void)
 {
-    // Initialize.
     log_init();
     NRF_LOG_FLUSH();
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
-    // power_management_init();
     leds_init();
-
 
     ble_stack_init();
     ble_gap_params_init();
@@ -731,42 +877,21 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
-    nrf_gpio_cfg_output(output_pin);
-    nrf_gpio_pin_set(output_pin);
-    // temp sensor code
+    // // call the clock configuration
+    // lfclk_config();
+
+    // call the rtc configuration
+    rtc_config();
+    rtc_start();
 
 
-    timer_init();
-    counter_init();
-    setup_gpiote_event(TEMP_SENSOR_1);
-    setup_timer_and_counter_ppi();
 
-
-    NRF_TIMER1->TASKS_START = 1;
-    NRF_TIMER2->TASKS_START = 1;
-
-
-    // Start execution.
-    // ret_code_t err_code;
-    // nrf_saadc_value_t sample;
-    // saadc_init();
-    ble_advertising_start();
-
-// Setting up the RTC
-
-    for(;;)
+    // Sleep in the while loop until an event is generated
+    while (true)
     {
-        // err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
-        // APP_ERROR_CHECK(err_code);
-        
-        // double V = (double)(((sample * 1.2) / (4095)) * 3);
-        // NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
-        // NRF_LOG_INFO("sample: %d", V);
-        // ble_write_to_characteristic(sample, voltage_char_handles);
         NRF_LOG_FLUSH();
-        // bsp_board_led_on(LEDBUTTON_LED);
-        // nrf_delay_ms(300);
-        // bsp_board_led_off(LEDBUTTON_LED);
-        // nrf_delay_us(3000);        
+        // __SEV();
+        // __WFE();
+        // __WFE();
     }
 }
