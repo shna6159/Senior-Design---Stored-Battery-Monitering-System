@@ -44,9 +44,9 @@
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
 #define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(0, 11)
-#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 12)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 11)
 
-#define output_pin NRF_GPIO_PIN_MAP(0, 22)
+#define output_pin NRF_GPIO_PIN_MAP(0, 12)
 
 #define TX_POWER_LEVEL 8
 
@@ -554,20 +554,20 @@ void saadc_init(void)
 static void timer_init()
 {
     nrf_gpio_cfg_output(output_pin);
-    nrf_gpio_pin_set(output_pin);
+    // nrf_gpio_pin_set(output_pin);
 
     NVIC_EnableIRQ(TIMER1_IRQn);
     NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
     nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
 
     NRF_TIMER1->TASKS_STOP = 1;
+    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
     NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
     NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
 
     NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
 
-    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
 
     NRF_TIMER1->EVENTS_COMPARE[0] = 0;
@@ -577,10 +577,10 @@ static void timer_init()
 static void counter_init()
 {
     NRF_TIMER2->TASKS_STOP = 1;
+    NRF_TIMER1->TASKS_CLEAR = 1;
     NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
     NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
     NRF_TIMER2->TASKS_CLEAR = 1;
-    NRF_TIMER2->EVENTS_COMPARE[0] = 0;
 
     NRF_LOG_DEBUG("Timer2 setup");
 }
@@ -626,6 +626,14 @@ static void setup_timer_and_counter_ppi()
     NRF_PPI->CHENSET |= 1 << 2;
 
     NRF_LOG_DEBUG("ppi_gpiote_counter_init_falling");
+
+    NRF_PPI->CHEN |= 1 << 3;
+    *(&(NRF_PPI->CH3_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH3_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
+    NRF_PPI->CHENSET |= 1 << 3;
+
+    NRF_LOG_DEBUG("Setting up the ppi for timer pin high"); // TODO: remove this
+
 }
 
 static int decimal_part(double num){
@@ -644,7 +652,6 @@ static int exponent_part(double num){
 
 void TIMER1_IRQHandler(void)
 {
-    NRF_TIMER2->TASKS_STOP;
     if (NRF_TIMER1->EVENTS_COMPARE[0] == 1)
     {
         NRF_TIMER1->EVENTS_COMPARE[0] = 0;
@@ -656,6 +663,10 @@ void TIMER1_IRQHandler(void)
         {
             NRF_TIMER1->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
+
+            NRF_TIMER2->CC[0] = 0;
+            NRF_TIMER1->CC[2] = 0;
+            NRF_TIMER1->CC[3] = 0;
 
             NRF_TIMER1->TASKS_START = 1;
             NRF_TIMER2->TASKS_START = 1;
@@ -689,12 +700,20 @@ void TIMER1_IRQHandler(void)
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
                     temp_sensor = true;
                     setup_gpiote_event(TEMP_SENSOR_2);
+
+                    NRF_TIMER2->CC[0] = 0;
+                    NRF_TIMER1->CC[2] = 0;
+                    NRF_TIMER1->CC[3] = 0;
                     NRF_TIMER1->TASKS_START = 1;
                     NRF_TIMER2->TASKS_START = 1;
                 }
                 else{
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     temp_sensor = false;
+                    
+                    NRF_TIMER2->CC[0] = 0;
+                    NRF_TIMER1->CC[2] = 0;
+                    NRF_TIMER1->CC[3] = 0;
                 }
 
                 // nrf_delay_ms(10000);
@@ -706,7 +725,9 @@ void TIMER1_IRQHandler(void)
                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
                 valid_temp_counter += 1;
                 
-
+                NRF_TIMER2->CC[0] = 0;
+                NRF_TIMER1->CC[2] = 0;
+                NRF_TIMER1->CC[3] = 0;
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
@@ -763,7 +784,7 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         temp_sensor_measure();
 
 
-        ble_advertising_start();
+        // ble_advertising_start();
 
         nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
     }
