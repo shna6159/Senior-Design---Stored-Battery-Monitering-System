@@ -6,76 +6,80 @@
 #include "app_error.h"
 #include <stdint.h>
 #include <stdbool.h>
-#define COMPARE_COUNTERTIME  (3UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 
-#ifdef BSP_LED_0
-    #define TICK_EVENT_OUTPUT     BSP_LED_0                                 /**< Pin number for indicating tick event. */
-#endif
-#ifndef TICK_EVENT_OUTPUT
-    #error "Please indicate output pin"
-#endif
-#ifdef BSP_LED_1
-    #define COMPARE_EVENT_OUTPUT   BSP_LED_1                                /**< Pin number for indicating compare event. */
-#endif
-#ifndef COMPARE_EVENT_OUTPUT
-    #error "Please indicate output pin"
-#endif
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+#include "nrf_log_default_backends.h"
 
-const nrf_drv_rtc_t rtc = NRF_DRV_RTC_INSTANCE(0); /**< Declaring an instance of nrf_drv_rtc for RTC0. */
+// Create a handle that will point to the RTC 2 of nrf device
+const nrfx_rtc_t rtc = NRFX_RTC_INSTANCE(2); // rtc 2 handle
 
-/** @brief: Function for handling the RTC0 interrupts.
- * Triggered on TICK and COMPARE0 match.
- */
-static void rtc_handler(nrf_drv_rtc_int_type_t int_type)
-{
-    if (int_type == NRF_DRV_RTC_INT_COMPARE0)
-    {
-        nrf_gpio_pin_toggle(COMPARE_EVENT_OUTPUT);
-    }
-    else if (int_type == NRF_DRV_RTC_INT_TICK)
-    {
-        nrf_gpio_pin_toggle(TICK_EVENT_OUTPUT);
-    }
-}
+#define ADVERTISING_LED BSP_BOARD_LED_1 /**< Is on when device is advertising. */
 
-/** @brief Function configuring gpio for pin toggling.
- */
-static void leds_config(void)
-{
-    bsp_board_init(BSP_INIT_LEDS);
-}
+// Initialize the low frequency clock so that the rtc can be fed by this clock
+// when using soft-device, this function is not needed, we will see this in future tutorials
+// once we start to program the bluetooth communication
 
-/** @brief Function starting the internal LFCLK XTAL oscillator.
- */
 static void lfclk_config(void)
 {
+    // Initialize the low frequency clock
     ret_code_t err_code = nrf_drv_clock_init();
-    APP_ERROR_CHECK(err_code);
+    APP_ERROR_CHECK(err_code); // check for the errors
 
+    // Request the clock to not to generate events
     nrf_drv_clock_lfclk_request(NULL);
+    NRF_LOG_DEBUG("Low frequency clock setup");
 }
 
-/** @brief Function initialization and configuration of RTC driver instance.
- */
+// RTC interrupt handler which will be used to handle the interrupt events
+static void rtc_handler(nrfx_rtc_int_type_t int_type)
+{
+
+    // Check if the interrupt occurred due to tick event
+    if (int_type == NRFX_RTC_INT_TICK)
+    {
+        // perform some action
+        bsp_board_led_invert(ADVERTISING_LED);
+    }
+
+    else
+    {
+        // default action
+        // leave it empty
+    }
+}
+
+// A function to configure and intialize the RTC
 static void rtc_config(void)
 {
-    uint32_t err_code;
 
-    //Initialize RTC instance
-    nrf_drv_rtc_config_t config = NRF_DRV_RTC_DEFAULT_CONFIG;
-    config.prescaler = 4095;
-    err_code = nrf_drv_rtc_init(&rtc, &config, rtc_handler);
+    uint32_t err_code; // a variable to hold the error values
+
+    // Create a struct of type nrfx_rtc_config_t and assign it default values
+    nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+
+    // Configure the prescaler to generate ticks for a specific time unit
+    // Configured it to tick every 125ms
+    rtc_config.prescaler = 4095; // tick =  32768 / (4095 + 1) = 8Hz = 125ms
+
+    // Initialize the rtc and pass the configurations along with the interrupt handler
+    err_code = nrfx_rtc_init(&rtc, &rtc_config, rtc_handler);
+    APP_ERROR_CHECK(err_code); // check for errors
+
+    // Generate a tick event on each tick
+    nrfx_rtc_tick_enable(&rtc, true);
+
+    // start the rtc
+    nrfx_rtc_enable(&rtc);
+    NRF_LOG_DEBUG("RTC config");
+}
+
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
-    //Enable tick event & interrupt
-    nrf_drv_rtc_tick_enable(&rtc,true);
-
-    //Set compare channel to trigger interrupt after COMPARE_COUNTERTIME seconds
-    err_code = nrf_drv_rtc_cc_set(&rtc,0,COMPARE_COUNTERTIME * 8,true);
-    APP_ERROR_CHECK(err_code);
-
-    //Power on RTC instance
-    nrf_drv_rtc_enable(&rtc);
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
 /**
@@ -83,19 +87,22 @@ static void rtc_config(void)
  */
 int main(void)
 {
-    leds_config();
+log_init();
+    // Initialize the LEDS
+    bsp_board_init(BSP_INIT_LEDS);
 
+    // // call the clock configuration
     lfclk_config();
 
+    // call the rtc configuration
     rtc_config();
 
+    // Sleep in the while loop until an event is generated
     while (true)
     {
+        NRF_LOG_FLUSH();
         __SEV();
         __WFE();
         __WFE();
     }
 }
-
-
-/**  @} */
