@@ -11,10 +11,14 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-// Create a handle that will point to the RTC 2 of nrf device
-const nrfx_rtc_t rtc = NRFX_RTC_INSTANCE(2); // rtc 2 handle
+// COMPARE_COUNTERTIME is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
+#define COMPARE_COUNTERTIME  (3UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 
 #define ADVERTISING_LED BSP_BOARD_LED_1 /**< Is on when device is advertising. */
+#define UNEXPECTED_LED BSP_BOARD_LED_3 
+// Create a handle that will point to the RTC 2 of nrf device
+const nrf_drv_rtc_t rtc = NRFX_RTC_INSTANCE(2); // rtc 2 handle
+
 
 // Initialize the low frequency clock so that the rtc can be fed by this clock
 // when using soft-device, this function is not needed, we will see this in future tutorials
@@ -36,12 +40,19 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
 {
 
     // Check if the interrupt occurred due to tick event
-    if (int_type == NRFX_RTC_INT_TICK)
+    if (int_type == NRF_DRV_RTC_INT_TICK)
     {
         // perform some action
         bsp_board_led_invert(ADVERTISING_LED);
     }
-
+    else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
+    {
+        NRF_LOG_DEBUG("RTC compare event");
+        bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
+        nrf_drv_rtc_cc_set(&rtc,0,COMPARE_COUNTERTIME * 8,true);
+        // nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_START);
+    }
     else
     {
         // default action
@@ -56,21 +67,24 @@ static void rtc_config(void)
     uint32_t err_code; // a variable to hold the error values
 
     // Create a struct of type nrfx_rtc_config_t and assign it default values
-    nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+    nrf_drv_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
 
     // Configure the prescaler to generate ticks for a specific time unit
     // Configured it to tick every 125ms
     rtc_config.prescaler = 4095; // tick =  32768 / (4095 + 1) = 8Hz = 125ms
 
     // Initialize the rtc and pass the configurations along with the interrupt handler
-    err_code = nrfx_rtc_init(&rtc, &rtc_config, rtc_handler);
+    err_code = nrf_drv_rtc_init(&rtc, &rtc_config, rtc_handler);
     APP_ERROR_CHECK(err_code); // check for errors
 
     // Generate a tick event on each tick
-    nrfx_rtc_tick_enable(&rtc, true);
+    // nrf_drv_rtc_tick_enable(&rtc, true);
+
+    err_code = nrf_drv_rtc_cc_set(&rtc,0,COMPARE_COUNTERTIME * 8,true);
+    APP_ERROR_CHECK(err_code);
 
     // start the rtc
-    nrfx_rtc_enable(&rtc);
+    nrf_drv_rtc_enable(&rtc);
     NRF_LOG_DEBUG("RTC config");
 }
 
