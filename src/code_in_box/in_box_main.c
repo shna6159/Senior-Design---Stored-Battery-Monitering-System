@@ -556,28 +556,28 @@ static void timer_init()
     nrf_gpio_cfg_output(output_pin);
     // nrf_gpio_pin_set(output_pin);
 
-    NVIC_EnableIRQ(TIMER1_IRQn);
-    NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
+    NVIC_EnableIRQ(TIMER3_IRQn);
+    NVIC_SetPriority(TIMER3_IRQn, APP_IRQ_PRIORITY_LOW);
     nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
 
-    NRF_TIMER1->TASKS_STOP = 1;
-    NRF_TIMER1->TASKS_CLEAR = 1;
-    NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-    NRF_TIMER1->PRESCALER = 0; // uses 16 MHz clk
-    NRF_TIMER1->CC[0] = 40000; // approx - 10^-2 / 4 s
+    NRF_TIMER3->TASKS_STOP = 1;
+    NRF_TIMER3->TASKS_CLEAR = 1;
+    NRF_TIMER3->MODE = TIMER_MODE_MODE_Timer;
+    NRF_TIMER3->PRESCALER = 0; // uses 16 MHz clk
+    NRF_TIMER3->CC[0] = 40000; // approx - 10^-2 / 4 s
 
-    NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+    NRF_TIMER3->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
 
-    NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+    NRF_TIMER3->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
 
-    NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+    NRF_TIMER3->EVENTS_COMPARE[0] = 0;
 
     NRF_LOG_DEBUG("Timer1 setup");
 }
 static void counter_init()
 {
     NRF_TIMER2->TASKS_STOP = 1;
-    NRF_TIMER1->TASKS_CLEAR = 1;
+    NRF_TIMER2->TASKS_CLEAR = 1;
     NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
     NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
     NRF_TIMER2->TASKS_CLEAR = 1;
@@ -605,9 +605,9 @@ static void setup_timer_and_counter_ppi()
 // APP_ERROR_CHECK(err_code);
 
     NRF_PPI->CHEN |= 1 << 0;
-    *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER3->EVENTS_COMPARE[0];
     *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
-    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_STOP;
+    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER3->TASKS_STOP;
     NRF_PPI->CHENSET |= 1 << 0;
 
     NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
@@ -615,20 +615,20 @@ static void setup_timer_and_counter_ppi()
     NRF_PPI->CHEN |= 1 << 1;
     *(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
     *(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
-    *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[2];
+    *(&(NRF_PPI->FORK[1].TEP)) = (uint32_t)&NRF_TIMER3->TASKS_CAPTURE[2];
     NRF_PPI->CHENSET |= 1 << 1;
 
     NRF_LOG_DEBUG("ppi_gpiote_counter_init_rising");
 
     NRF_PPI->CHEN |= 1 << 2;
     *(&(NRF_PPI->CH2_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[1];
-    *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_CAPTURE[3];
+    *(&(NRF_PPI->FORK[2].TEP)) = (uint32_t)&NRF_TIMER3->TASKS_CAPTURE[3];
     NRF_PPI->CHENSET |= 1 << 2;
 
     NRF_LOG_DEBUG("ppi_gpiote_counter_init_falling");
 
     NRF_PPI->CHEN |= 1 << 3;
-    *(&(NRF_PPI->CH3_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH3_EEP)) = (uint32_t)&NRF_TIMER3->EVENTS_COMPARE[0];
     *(&(NRF_PPI->CH3_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
     NRF_PPI->CHENSET |= 1 << 3;
 
@@ -650,25 +650,25 @@ static int exponent_part(double num){
     return intpart;
 }
 
-void TIMER1_IRQHandler(void)
+void TIMER3_IRQHandler(void)
 {
-    if (NRF_TIMER1->EVENTS_COMPARE[0] == 1)
+    if (NRF_TIMER3->EVENTS_COMPARE[0] == 1)
     {
-        NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+        NRF_TIMER3->EVENTS_COMPARE[0] = 0;
 
-        int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
+        int pulse_width = NRF_TIMER3->CC[3] - NRF_TIMER3->CC[2];
 
 
         if ((pulse_width) < 0)
         {
-            NRF_TIMER1->TASKS_CLEAR = 1;
+            NRF_TIMER3->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
 
             NRF_TIMER2->CC[0] = 0;
-            NRF_TIMER1->CC[2] = 0;
-            NRF_TIMER1->CC[3] = 0;
+            NRF_TIMER3->CC[2] = 0;
+            NRF_TIMER3->CC[3] = 0;
 
-            NRF_TIMER1->TASKS_START = 1;
+            NRF_TIMER3->TASKS_START = 1;
             NRF_TIMER2->TASKS_START = 1;
         }
         else
@@ -676,7 +676,7 @@ void TIMER1_IRQHandler(void)
 
             frequency = NRF_TIMER2->CC[0] * 4 * 100;
             duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
-            NRF_TIMER1->TASKS_CLEAR = 1;
+            NRF_TIMER3->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
             if (valid_temp_counter == NUM_TEMPERATURE_PERIODS)
             {
@@ -702,9 +702,9 @@ void TIMER1_IRQHandler(void)
                     setup_gpiote_event(TEMP_SENSOR_2);
 
                     NRF_TIMER2->CC[0] = 0;
-                    NRF_TIMER1->CC[2] = 0;
-                    NRF_TIMER1->CC[3] = 0;
-                    NRF_TIMER1->TASKS_START = 1;
+                    NRF_TIMER3->CC[2] = 0;
+                    NRF_TIMER3->CC[3] = 0;
+                    NRF_TIMER3->TASKS_START = 1;
                     NRF_TIMER2->TASKS_START = 1;
                 }
                 else{
@@ -712,12 +712,12 @@ void TIMER1_IRQHandler(void)
                     temp_sensor = false;
                     
                     NRF_TIMER2->CC[0] = 0;
-                    NRF_TIMER1->CC[2] = 0;
-                    NRF_TIMER1->CC[3] = 0;
+                    NRF_TIMER3->CC[2] = 0;
+                    NRF_TIMER3->CC[3] = 0;
                 }
 
                 // nrf_delay_ms(10000);
-                // NRF_TIMER1->TASKS_START = 1;
+                // NRF_TIMER3->TASKS_START = 1;
                 // NRF_TIMER2->TASKS_START = 1;
             }
             else
@@ -726,9 +726,9 @@ void TIMER1_IRQHandler(void)
                 valid_temp_counter += 1;
                 
                 NRF_TIMER2->CC[0] = 0;
-                NRF_TIMER1->CC[2] = 0;
-                NRF_TIMER1->CC[3] = 0;
-                NRF_TIMER1->TASKS_START = 1;
+                NRF_TIMER3->CC[2] = 0;
+                NRF_TIMER3->CC[3] = 0;
+                NRF_TIMER3->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
             }
         }
@@ -736,7 +736,7 @@ void TIMER1_IRQHandler(void)
 }
 
 static void temp_sensor_measure(void){
-    NRF_TIMER1->TASKS_START = 1;
+    NRF_TIMER3->TASKS_START = 1;
     NRF_TIMER2->TASKS_START = 1;
 }
 
