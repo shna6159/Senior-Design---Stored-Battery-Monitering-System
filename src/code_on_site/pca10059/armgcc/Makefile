@@ -67,6 +67,10 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_saadc.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
   $(SDK_ROOT)/components/softdevice/common/nrf_sdh_soc.c \
+    $(SDK_ROOT)/components/ble/ble_db_discovery/ble_db_discovery.c \
+  $(SDK_ROOT)/components/ble/nrf_ble_gq/nrf_ble_gq.c \
+  $(SDK_ROOT)/components/libraries/bsp/bsp_btn_ble.c \
+  $(SDK_ROOT)/components/ble/nrf_ble_scan/nrf_ble_scan.c \
   $(PROJ_DIR)/on_site_main.c \
   
   
@@ -74,6 +78,10 @@ SRC_FILES += \
 INC_FOLDERS += \
   $(SDK_ROOT)/components/nfc/ndef/generic/message \
   $(SDK_ROOT)/components/nfc/t2t_lib \
+  $(SDK_ROOT)/components/ble/ble_db_discovery \
+  $(SDK_ROOT)/components/ble/nrf_ble_gq \
+  $(SDK_ROOT)/components/libraries/bsp \
+  $(SDK_ROOT)/components/ble/nrf_ble_scan \
   $(SDK_ROOT)/components/nfc/t4t_parser/hl_detection_procedure \
   $(SDK_ROOT)/components/ble/ble_services/ble_ancs_c \
   $(SDK_ROOT)/components/ble/ble_services/ble_ias_c \
