@@ -45,6 +45,7 @@ SRC_FILES += \
   $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_uart.c \
   $(SDK_ROOT)/modules/nrfx/soc/nrfx_atomic.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_clock.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_rtc.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_gpiote.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/prs/nrfx_prs.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uart.c \
@@ -222,7 +223,7 @@ CFLAGS += -DS140
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -mcpu=cortex-m4
 CFLAGS += -mthumb -mabi=aapcs
-CFLAGS += -Wall -Werror
+# CFLAGS += -Wall -Werror
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 # keep every function in a separate section, this allows linker to discard unused ones
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing

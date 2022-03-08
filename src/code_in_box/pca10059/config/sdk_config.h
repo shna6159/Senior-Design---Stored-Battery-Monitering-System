@@ -3309,7 +3309,7 @@
 // <e> NRFX_RTC_ENABLED - nrfx_rtc - RTC peripheral driver
 //==========================================================
 #ifndef NRFX_RTC_ENABLED
-#define NRFX_RTC_ENABLED 0
+#define NRFX_RTC_ENABLED 1
 #endif
 // <q> NRFX_RTC0_ENABLED  - Enable RTC0 instance
  
@@ -3329,7 +3329,7 @@
  
 
 #ifndef NRFX_RTC2_ENABLED
-#define NRFX_RTC2_ENABLED 0
+#define NRFX_RTC2_ENABLED 1
 #endif
 
 // <o> NRFX_RTC_MAXIMUM_LATENCY_US - Maximum possible time[us] in highest priority interrupt 
@@ -3979,7 +3979,7 @@
  
 
 #ifndef NRFX_TIMER1_ENABLED
-#define NRFX_TIMER1_ENABLED 1
+#define NRFX_TIMER1_ENABLED 0
 #endif
 
 // <q> NRFX_TIMER2_ENABLED  - Enable TIMER2 instance
@@ -3993,7 +3993,7 @@
  
 
 #ifndef NRFX_TIMER3_ENABLED
-#define NRFX_TIMER3_ENABLED 0
+#define NRFX_TIMER3_ENABLED 1
 #endif
 
 // <q> NRFX_TIMER4_ENABLED  - Enable TIMER4 instance
@@ -5408,7 +5408,7 @@
 // <e> RTC_ENABLED - nrf_drv_rtc - RTC peripheral driver - legacy layer
 //==========================================================
 #ifndef RTC_ENABLED
-#define RTC_ENABLED 0
+#define RTC_ENABLED 1
 #endif
 // <o> RTC_DEFAULT_CONFIG_FREQUENCY - Frequency  <16-32768> 
 
@@ -5459,7 +5459,7 @@
  
 
 #ifndef RTC2_ENABLED
-#define RTC2_ENABLED 0
+#define RTC2_ENABLED 1
 #endif
 
 // <o> NRF_MAXIMUM_LATENCY_US - Maximum possible time[us] in highest priority interrupt 
@@ -5752,7 +5752,7 @@
  
 
 #ifndef TIMER1_ENABLED
-#define TIMER1_ENABLED 1
+#define TIMER1_ENABLED 0
 #endif
 
 // <q> TIMER2_ENABLED  - Enable TIMER2 instance
@@ -5766,7 +5766,7 @@
  
 
 #ifndef TIMER3_ENABLED
-#define TIMER3_ENABLED 0
+#define TIMER3_ENABLED 1
 #endif
 
 // <q> TIMER4_ENABLED  - Enable TIMER4 instance

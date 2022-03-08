@@ -90,7 +90,7 @@
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
-#define RTC_VAL_IN_SEC  (10UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define RTC_VAL_IN_SEC  (20UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
 
 
@@ -268,6 +268,7 @@ static void ble_advertising_init(void)
     adv_params.p_peer_addr = NULL;
     adv_params.filter_policy = BLE_GAP_ADV_FP_ANY;
     adv_params.interval = APP_ADV_INTERVAL;
+
 
     sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
 
@@ -759,7 +760,7 @@ static void temp_sensor_measure(void){
 //     nrf_drv_clock_lfclk_request(NULL);
 //     NRF_LOG_DEBUG("Low frequency clock setup");
 // }
-
+bool temp_val = false;
 // RTC interrupt handler which will be used to handle the interrupt events
 static void rtc_handler(nrfx_rtc_int_type_t int_type)
 {
@@ -784,7 +785,16 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         temp_sensor_measure();
 
 
-        // ble_advertising_start();
+        if(temp_val == false){
+            ble_advertising_start();
+            temp_val = true;
+        }
+        else{
+            sd_ble_gap_adv_stop(m_adv_handle);
+            temp_val = false;
+        }
+        
+        
 
         nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
     }
@@ -893,5 +903,6 @@ int main(void)
         // __SEV();
         // __WFE();
         // __WFE();
+        nrf_pwr_mgmt_run();
     }
 }
