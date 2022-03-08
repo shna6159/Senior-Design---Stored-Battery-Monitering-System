@@ -5,6 +5,10 @@
         "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SBMS"
     ],
     "files.associations": {
-        "algorithm": "c"
+        "algorithm": "c",
+        "bsp.h": "c",
+        "ble_db_discovery.h": "c",
+        "nrf_ble_gq.h": "c",
+        "nrf_ble_scan.h": "c"
     }
 }

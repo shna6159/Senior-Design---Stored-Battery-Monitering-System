@@ -1,234 +1,3 @@
-// // // The main code for the on-site controller goes here
-// // int main(){
-// //     return 0;
-// // }
-// #include <stdint.h>
-// #include <string.h>
-// #include "nordic_common.h"
-// #include "nrf.h"
-// #include "app_error.h"
-// #include "ble.h"
-// #include "ble_err.h"
-// #include "ble_hci.h"
-// #include "ble_srv_common.h"
-// #include "ble_advdata.h"
-// #include "ble_conn_params.h"
-// #include "nrf_sdh.h"
-// #include "nrf_sdh_ble.h"
-// #include "boards.h"
-// #include "app_timer.h"
-// #include "app_button.h"
-// #include "ble_lbs.h"
-// #include "nrf_ble_gatt.h"
-// #include "nrf_ble_qwr.h"
-// #include "nrf_pwr_mgmt.h"
-// #include "nrf_delay.h"
-// #include "nrf_gpio.h"
-// #include "nrf_drv_gpiote.h"
-
-// #include <stdbool.h>
-// #include <stdio.h>
-// #include "nrf_drv_saadc.h"
-// #include "nrf_drv_ppi.h"
-// #include "nrf_drv_timer.h"
-// #include "app_util_platform.h"
-
-// #include "nrf_log.h"
-// #include "nrf_log_ctrl.h"
-// #include "nrf_log_default_backends.h"
-
-// #define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0,11)
-// #define output_pin NRF_GPIO_PIN_MAP(0,30)
-
-
-// static void timer_init()
-// {
-// 	NRF_TIMER1->TASKS_STOP = 1;
-// 	NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-// 	NRF_TIMER1->PRESCALER = 8;	// Fhck / 2^8 
-// 	NRF_TIMER1->CC[0] = 62500;	// 62500 - 1s
-	
-// 	NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_16Bit << TIMER_BITMODE_BITMODE_Pos);	
-	
-// 	NRF_TIMER1->TASKS_CLEAR = 1;
-// 	NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
-	
-// 	NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-// }
-
-// static void counter_init()
-// {
-// 	NRF_TIMER2->TASKS_STOP = 1;	
-// 	NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
-// 	NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_24Bit << TIMER_BITMODE_BITMODE_Pos);
-// 	NRF_TIMER2->TASKS_CLEAR = 1;
-// 	NRF_TIMER2->EVENTS_COMPARE[0] = 0;
-// }
-
-// static void gpiote_init(uint32_t pin)
-// {
-// 	NRF_GPIOTE->CONFIG[0] 	= 	0x01 << 0; 								// MODE: Event
-// 	NRF_GPIOTE->CONFIG[0] 	|= 	pin << 8;								// Pin number
-// 	NRF_GPIOTE->CONFIG[0] 	|= 	NRF_GPIOTE_POLARITY_LOTOHI	<< 16;		// Event rising edge 	
-// }
-
-// static void ppi_timer_stop_counter_init()
-// {
-// 	NRF_PPI->CHEN |= 1 << 0;
-// 	*(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
-// 	*(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
-// 	NRF_PPI->CHENSET |= 1 << 0;
-// }
-
-// static void ppi_gpiote_counter_init()
-// {
-// 	NRF_PPI->CHEN |= 1 << 1;
-// 	*(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
-// 	*(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
-// 	NRF_PPI->CHENSET |= 1 << 1;
-// }
-
-// int main()
-// {
-//     // Soft Device initialization..
-//     NRF_LOG_INFO("Program Start");
-//    	NVIC_EnableIRQ(TIMER1_IRQn);
-//     NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);	
-
-//     nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
-
-// 	counter_init();
-// 	timer_init();
-// 	gpiote_init(FREQ_MEASURE_PIN);
-// 	ppi_gpiote_counter_init();
-// 	ppi_timer_stop_counter_init();
-
-// 	NRF_TIMER1->TASKS_START = 1;
-// 	NRF_TIMER2->TASKS_START = 1;
-	
-// 	for(;;) {
-// 		// power manage //
-// 	}
-// }
-
-// void TIMER1_IRQHandler(void) 
-// {
-// 	if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
-// 	{
-// 		NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-// 		NRF_TIMER2->TASKS_CAPTURE[0] = 1;
-				
-// 		NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
-
-
-
-// 		NRF_TIMER1->TASKS_CLEAR = 1;
-// 		NRF_TIMER2->TASKS_CLEAR = 1;	
-						
-// 		// NRF_TIMER2->TASKS_START = 1;			
-//     }
-// }
-
-
-
-// // static void timer_init_2()
-// // {
-// // 	NRF_TIMER1->TASKS_STOP = 1;
-// // 	NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
-// // 	NRF_TIMER1->PRESCALER = 8; //8;	// Fhck / 2^8 
-// // 	NRF_TIMER1->CC[0] =  62500;	// 62500 - 1s
-	
-// // 	NRF_TIMER1->BITMODE = (TIMER_BITMODE_BITMODE_16Bit << TIMER_BITMODE_BITMODE_Pos);	
-	
-// // 	NRF_TIMER1->TASKS_CLEAR = 1;
-// // 	NRF_TIMER1->INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
-	
-// // 	NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-// // }
-
-// // static void counter_init()
-// // {
-// // 	NRF_TIMER2->TASKS_STOP = 1;	
-// // 	NRF_TIMER2->MODE = TIMER_MODE_MODE_Counter;
-// // 	NRF_TIMER2->BITMODE = (TIMER_BITMODE_BITMODE_24Bit << TIMER_BITMODE_BITMODE_Pos);
-// // 	NRF_TIMER2->TASKS_CLEAR = 1;
-// // 	NRF_TIMER2->EVENTS_COMPARE[0] = 0;
-// // }
-
-// // static void gpiote_init(uint32_t pin)
-// // {
-// // 	NRF_GPIOTE->CONFIG[0] 	= 	0x01 << 0; 								// MODE: Event
-// // 	NRF_GPIOTE->CONFIG[0] 	|= 	pin << 8;								// Pin number
-// // 	NRF_GPIOTE->CONFIG[0] 	|= 	NRF_GPIOTE_POLARITY_LOTOHI	<< 16;		// Event rising edge 	
-// // }
-
-// // static void ppi_timer_stop_counter_init()
-// // {
-// // 	NRF_PPI->CHEN |= 1 << 0;
-// // 	*(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
-// // 	*(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_STOP;
-// // 	NRF_PPI->CHENSET |= 1 << 0;
-// // }
-
-// // static void ppi_gpiote_counter_init()
-// // {
-// // 	NRF_PPI->CHEN |= 1 << 1;
-// // 	*(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
-// // 	*(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
-// // 	NRF_PPI->CHENSET |= 1 << 1;
-// // }
-
-// // void TIMER1_IRQHandler(void) 
-// // {
-// // 	if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
-// // 	{
-// // 		NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-// // 		NRF_TIMER2->TASKS_CAPTURE[0] = 1;
-				
-// // 		NRF_LOG_INFO("cc: %dHz", NRF_TIMER2->CC[0]);
-		
-      	
-// // 		NRF_TIMER1->TASKS_CLEAR = 1;
-// // 		NRF_TIMER2->TASKS_CLEAR = 1;	
-						
-// // 		NRF_TIMER2->TASKS_START = 1;			
-// //     }
-// // }
-
-
-// // int main(void)
-// // {
-    
-// //     // Start scanning for peripherals and initiate connection
-// //     // with devices that advertise KALE UUID.
-// // 			NRF_LOG_INFO("KEYFOB example started.");
-		
-// // 		 // Soft Device initialization..
-// // 			nrf_gpio_cfg_output(output_pin);
-// // 			NVIC_EnableIRQ(TIMER1_IRQn);
-// // 			NVIC_SetPriority(TIMER1_IRQn, 7);	
-
-// // 			nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
-
-// // 			counter_init();
-// // 			timer_init_2();
-// // 			gpiote_init(FREQ_MEASURE_PIN);
-// // 			ppi_gpiote_counter_init();
-// // 			ppi_timer_stop_counter_init();
-
-// // 			NRF_TIMER1->TASKS_START = 1;
-// // 			NRF_TIMER2->TASKS_START = 1;
-			
-// // 	for(;;)
-// // 	{
-// //         // if (NRF_LOG_PROCESS() == true)
-// //         // {
-// //         //     nrf_pwr_mgmt_run();
-// //         // }
-// //     }
-// // }
-
-
 /**
  * Copyright (c) 2014 - 2021, Nordic Semiconductor ASA
  *
@@ -268,179 +37,492 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-/** @file
+/**
+ * @brief BLE LED Button Service central and client application main file.
  *
- * @defgroup ble_sdk_uart_over_ble_main main.c
- * @{
- * @ingroup  ble_sdk_app_nus_eval
- * @brief    UART over BLE application main file.
- *
- * This file contains the source code for a sample application that uses the Nordic UART service.
- * This application uses the @ref srvlib_conn_params module.
+ * This file contains the source code for a sample client application using the LED Button service.
  */
 
-
 #include <stdint.h>
-
-#include "nrf_delay.h"
-#include "app_error.h"
-
-#include "nrf_drv_ppi.h"
-#include "nrf_drv_timer.h"
+#include <stdio.h>
+#include <string.h>
+#include "nrf_sdh.h"
+#include "nrf_sdh_ble.h"
+#include "nrf_sdh_soc.h"
+#include "nrf_pwr_mgmt.h"
 #include "app_timer.h"
-
+#include "boards.h"
+#include "bsp.h"
+#include "bsp_btn_ble.h"
+#include "ble.h"
+#include "ble_hci.h"
+#include "ble_advertising.h"
+#include "ble_conn_params.h"
+#include "ble_db_discovery.h"
+#include "ble_lbs_c.h"
+#include "nrf_ble_gatt.h"
+#include "nrf_ble_scan.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#include "nrf_drv_gpiote.h"
-#include "nrfx_gpiote.h"
-#include <math.h>
 
-#define PIN_IN NRF_GPIO_PIN_MAP(0,11)
-static const nrf_drv_timer_t m_timer_capture = NRFX_TIMER_INSTANCE(1);
-static const nrf_drv_timer_t m_timer_compare = NRFX_TIMER_INSTANCE(2);
+#define CENTRAL_SCANNING_LED            BSP_BOARD_LED_0                     /**< Scanning LED will be on when the device is scanning. */
+#define CENTRAL_CONNECTED_LED           BSP_BOARD_LED_1                     /**< Connected LED will be on when the device is connected. */
+#define LEDBUTTON_LED                   BSP_BOARD_LED_2                     /**< LED to indicate a change of state of the the Button characteristic on the peer. */
 
-void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
-NRF_LOG_INFO("In pin handler");
+#define SCAN_INTERVAL                   0x00A0                              /**< Determines scan interval in units of 0.625 millisecond. */
+#define SCAN_WINDOW                     0x0050                              /**< Determines scan window in units of 0.625 millisecond. */
+#define SCAN_DURATION                   0x0000                              /**< Timout when scanning. 0x0000 disables timeout. */
+
+#define MIN_CONNECTION_INTERVAL         MSEC_TO_UNITS(7.5, UNIT_1_25_MS)    /**< Determines minimum connection interval in milliseconds. */
+#define MAX_CONNECTION_INTERVAL         MSEC_TO_UNITS(30, UNIT_1_25_MS)     /**< Determines maximum connection interval in milliseconds. */
+#define SLAVE_LATENCY                   0                                   /**< Determines slave latency in terms of connection events. */
+#define SUPERVISION_TIMEOUT             MSEC_TO_UNITS(4000, UNIT_10_MS)     /**< Determines supervision time-out in units of 10 milliseconds. */
+
+#define LEDBUTTON_BUTTON_PIN            BSP_BUTTON_0                        /**< Button that will write to the LED characteristic of the peer */
+#define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(50)                 /**< Delay from a GPIOTE event until a button is reported as pushed (in number of timer ticks). */
+
+#define APP_BLE_CONN_CFG_TAG            1                                   /**< A tag identifying the SoftDevice BLE configuration. */
+#define APP_BLE_OBSERVER_PRIO           3                                   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
+
+NRF_BLE_SCAN_DEF(m_scan);                                       /**< Scanning module instance. */
+BLE_LBS_C_DEF(m_ble_lbs_c);                                     /**< Main structure used by the LBS client module. */
+NRF_BLE_GATT_DEF(m_gatt);                                       /**< GATT module instance. */
+BLE_DB_DISCOVERY_DEF(m_db_disc);                                /**< DB discovery module instance. */
+NRF_BLE_GQ_DEF(m_ble_gatt_queue,                                /**< BLE GATT Queue instance. */
+               NRF_SDH_BLE_CENTRAL_LINK_COUNT,
+               NRF_BLE_GQ_QUEUE_SIZE);
+
+static char const m_target_periph_name[] = "SBMS_in_box";     /**< Name of the device we try to connect to. This name is searched in the scan report data*/
+
+
+/**@brief Function to handle asserts in the SoftDevice.
+ *
+ * @details This function will be called in case of an assert in the SoftDevice.
+ *
+ * @warning This handler is an example only and does not fit a final product. You need to analyze
+ *          how your product is supposed to react in case of Assert.
+ * @warning On assert from the SoftDevice, the system can only recover on reset.
+ *
+ * @param[in] line_num     Line number of the failing ASSERT call.
+ * @param[in] p_file_name  File name of the failing ASSERT call.
+ */
+void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
+{
+    app_error_handler(0xDEADBEEF, line_num, p_file_name);
 }
 
-void timer_handler_read(nrf_timer_event_t event_type, void * p_context)
-{NRF_LOG_INFO("timer handler read");}
 
-uint8_t data_high=0;
-uint8_t data_array[23];
-uint8_t index1 = 0;
-void timer_handler_compare(nrf_timer_event_t event_type, void * p_context)
+/**@brief Function for handling the LED Button Service client errors.
+ *
+ * @param[in]   nrf_error   Error code containing information about what went wrong.
+ */
+static void lbs_error_handler(uint32_t nrf_error)
 {
-    // ret_code_t err_code;
-    int distance_1;
-    uint8_t data_high;
-    distance_1 = nrfx_timer_capture_get(&m_timer_capture, NRF_TIMER_CC_CHANNEL0);
-    
-    if (distance_1 < 1200 && distance_1 > 70){
-        data_high = fmin( fmax(round((distance_1 - 16.0 - 52.0 - 16.0 + 4.0) / 4.0), 0.0), 255.0);
-        //NRF_LOG_INFO("%d", distance_1);
-        data_array[index1]=data_high;
-        index1++;
-        
-        // if (index1 >= 10)
-        // {
-        //     if (index1 >= 0)
-        //     {
-        //         do
-        //         {
-                    //NRF_LOG_INFO("H");
-        //             // uint16_t length = 10;
-        //             // err_code = ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);
+    APP_ERROR_HANDLER(nrf_error);
+}
 
-        //         } while (err_code == NRF_ERROR_RESOURCES);
-        //     }
-        //     index1 = 0;
-        // }
+
+/**@brief Function for the LEDs initialization.
+ *
+ * @details Initializes all LEDs used by the application.
+ */
+static void leds_init(void)
+{
+    bsp_board_init(BSP_INIT_LEDS);
+}
+
+
+/**@brief Function to start scanning.
+ */
+static void scan_start(void)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_ble_scan_start(&m_scan);
+    APP_ERROR_CHECK(err_code);
+
+    bsp_board_led_off(CENTRAL_CONNECTED_LED);
+    bsp_board_led_on(CENTRAL_SCANNING_LED);
+}
+
+
+/**@brief Handles events coming from the LED Button central module.
+ */
+static void lbs_c_evt_handler(ble_lbs_c_t * p_lbs_c, ble_lbs_c_evt_t * p_lbs_c_evt)
+{
+    switch (p_lbs_c_evt->evt_type)
+    {
+        case BLE_LBS_C_EVT_DISCOVERY_COMPLETE:
+        {
+            ret_code_t err_code;
+
+            err_code = ble_lbs_c_handles_assign(&m_ble_lbs_c,
+                                                p_lbs_c_evt->conn_handle,
+                                                &p_lbs_c_evt->params.peer_db);
+            NRF_LOG_INFO("LED Button service discovered on conn_handle 0x%x.", p_lbs_c_evt->conn_handle);
+
+            err_code = app_button_enable();
+            APP_ERROR_CHECK(err_code);
+
+            // LED Button service discovered. Enable notification of Button.
+            err_code = ble_lbs_c_button_notif_enable(p_lbs_c);
+            APP_ERROR_CHECK(err_code);
+        } break; // BLE_LBS_C_EVT_DISCOVERY_COMPLETE
+
+        case BLE_LBS_C_EVT_BUTTON_NOTIFICATION:
+        {
+            NRF_LOG_INFO("Button state changed on peer to 0x%x.", p_lbs_c_evt->params.button.button_state);
+            if (p_lbs_c_evt->params.button.button_state)
+            {
+                bsp_board_led_on(LEDBUTTON_LED);
+            }
+            else
+            {
+                bsp_board_led_off(LEDBUTTON_LED);
+            }
+        } break; // BLE_LBS_C_EVT_BUTTON_NOTIFICATION
+
+        default:
+            // No implementation needed.
+            break;
     }
 }
 
-/**
- * @brief Function for configuring: PIN_IN pin for input sensing
+
+/**@brief Function for handling BLE events.
+ *
+ * @param[in]   p_ble_evt   Bluetooth stack event.
+ * @param[in]   p_context   Unused.
  */
-static void gpiote_init(void)
+static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     ret_code_t err_code;
 
-    err_code = nrf_drv_gpiote_init();
-    APP_ERROR_CHECK(err_code);
+    // For readability.
+    ble_gap_evt_t const * p_gap_evt = &p_ble_evt->evt.gap_evt;
 
-    nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
-    in_config.pull = NRF_GPIO_PIN_PULLDOWN;
+    switch (p_ble_evt->header.evt_id)
+    {
+        // Upon connection, check which peripheral has connected (HR or RSC), initiate DB
+        // discovery, update LEDs status and resume scanning if necessary. */
+        case BLE_GAP_EVT_CONNECTED:
+        {
+            NRF_LOG_INFO("Connected.");
+            err_code = ble_lbs_c_handles_assign(&m_ble_lbs_c, p_gap_evt->conn_handle, NULL);
+            APP_ERROR_CHECK(err_code);
 
-    err_code = nrf_drv_gpiote_in_init(PIN_IN, &in_config, in_pin_handler);
-    APP_ERROR_CHECK(err_code);
-    
-    nrf_drv_gpiote_in_event_enable(PIN_IN, false);
-    NRF_LOG_INFO("gpiote init");
+            err_code = ble_db_discovery_start(&m_db_disc, p_gap_evt->conn_handle);
+            APP_ERROR_CHECK(err_code);
+
+            // Update LEDs status, and check if we should be looking for more
+            // peripherals to connect to.
+            bsp_board_led_on(CENTRAL_CONNECTED_LED);
+            bsp_board_led_off(CENTRAL_SCANNING_LED);
+        } break;
+
+        // Upon disconnection, reset the connection handle of the peer which disconnected, update
+        // the LEDs status and start scanning again.
+        case BLE_GAP_EVT_DISCONNECTED:
+        {
+            NRF_LOG_INFO("Disconnected.");
+            scan_start();
+        } break;
+
+        case BLE_GAP_EVT_TIMEOUT:
+        {
+            // We have not specified a timeout for scanning, so only connection attemps can timeout.
+            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
+            {
+                NRF_LOG_DEBUG("Connection request timed out.");
+            }
+        } break;
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        {
+            // Accept parameters requested by peer.
+            err_code = sd_ble_gap_conn_param_update(p_gap_evt->conn_handle,
+                                        &p_gap_evt->params.conn_param_update_request.conn_params);
+            APP_ERROR_CHECK(err_code);
+        } break;
+
+        case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
+        {
+            NRF_LOG_DEBUG("PHY update request.");
+            ble_gap_phys_t const phys =
+            {
+                .rx_phys = BLE_GAP_PHY_AUTO,
+                .tx_phys = BLE_GAP_PHY_AUTO,
+            };
+            err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
+            APP_ERROR_CHECK(err_code);
+        } break;
+
+        case BLE_GATTC_EVT_TIMEOUT:
+        {
+            // Disconnect on GATT Client timeout event.
+            NRF_LOG_DEBUG("GATT Client Timeout.");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+        } break;
+
+        case BLE_GATTS_EVT_TIMEOUT:
+        {
+            // Disconnect on GATT Server timeout event.
+            NRF_LOG_DEBUG("GATT Server Timeout.");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+        } break;
+
+        default:
+            // No implementation needed.
+            break;
+    }
 }
 
-/**@brief Function for initializing the timer module.
+
+/**@brief LED Button client initialization.
  */
-static void timers_init(void)
+static void lbs_c_init(void)
 {
-    ret_code_t err_code = app_timer_init();
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
-    
-    err_code = nrfx_timer_init(&m_timer_capture, &timer_cfg, timer_handler_read);
-    APP_ERROR_CHECK(err_code);
-    err_code = nrfx_timer_init(&m_timer_compare, &timer_cfg, timer_handler_compare);
-    APP_ERROR_CHECK(err_code);
+    ret_code_t       err_code;
+    ble_lbs_c_init_t lbs_c_init_obj;
 
-    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer_compare, 10);
-    nrf_drv_timer_extended_compare(&m_timer_compare,
-                                   NRF_TIMER_CC_CHANNEL0,
-                                   ticks,
-                                   NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
-                                   true);
+    lbs_c_init_obj.evt_handler   = lbs_c_evt_handler;
+    lbs_c_init_obj.p_gatt_queue  = &m_ble_gatt_queue;
+    lbs_c_init_obj.error_handler = lbs_error_handler;
 
-    nrf_drv_timer_enable(&m_timer_capture);
-    nrf_drv_timer_enable(&m_timer_compare);
-    NRF_LOG_INFO("timers_init");
-    
+    err_code = ble_lbs_c_init(&m_ble_lbs_c, &lbs_c_init_obj);
+    APP_ERROR_CHECK(err_code);
 }
-nrf_ppi_channel_t ppi_channel_1;
-void ppi_init()
+
+
+/**@brief Function for initializing the BLE stack.
+ *
+ * @details Initializes the SoftDevice and the BLE event interrupts.
+ */
+static void ble_stack_init(void)
 {
     ret_code_t err_code;
 
-    err_code = nrf_drv_ppi_init();
+    err_code = nrf_sdh_enable_request();
     APP_ERROR_CHECK(err_code);
-    
-    err_code = nrf_drv_ppi_channel_alloc(&ppi_channel_1);
+
+    // Configure the BLE stack using the default settings.
+    // Fetch the start address of the application RAM.
+    uint32_t ram_start = 0;
+    err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
     APP_ERROR_CHECK(err_code);
-    
-    
-    uint32_t gpiote_evt_addr_1              = nrf_drv_gpiote_in_event_addr_get(PIN_IN);
-    
-    uint32_t timer_capture_task_addr  = nrf_drv_timer_task_address_get(&m_timer_capture, NRF_TIMER_TASK_CAPTURE0);
-    uint32_t timer_clear_task_addr    = nrf_drv_timer_task_address_get(&m_timer_capture, NRF_TIMER_TASK_CLEAR);
-    
-    
-    
-    err_code = nrf_drv_ppi_channel_assign(ppi_channel_1, gpiote_evt_addr_1, timer_capture_task_addr);
+
+    // Enable BLE stack.
+    err_code = nrf_sdh_ble_enable(&ram_start);
     APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_fork_assign(ppi_channel_1, timer_clear_task_addr);
-    APP_ERROR_CHECK(err_code);
-    
-    err_code = nrf_drv_ppi_channel_enable(ppi_channel_1);
-    APP_ERROR_CHECK(err_code);
-    //err_code = nrf_drv_ppi_channel_enable(ppi_channel_2);
+
+    // Register a handler for BLE events.
+    NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
+}
+
+
+/**@brief Function for handling events from the button handler module.
+ *
+ * @param[in] pin_no        The pin that the event applies to.
+ * @param[in] button_action The button action (press/release).
+ */
+static void button_event_handler(uint8_t pin_no, uint8_t button_action)
+{
+    ret_code_t err_code;
+
+    switch (pin_no)
+    {
+        case LEDBUTTON_BUTTON_PIN:
+            err_code = ble_lbs_led_status_send(&m_ble_lbs_c, button_action);
+            if (err_code != NRF_SUCCESS &&
+                err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                err_code != NRF_ERROR_INVALID_STATE)
+            {
+                APP_ERROR_CHECK(err_code);
+            }
+            if (err_code == NRF_SUCCESS)
+            {
+                NRF_LOG_INFO("LBS write LED state %d", button_action);
+            }
+            break;
+
+        default:
+            APP_ERROR_HANDLER(pin_no);
+            break;
+    }
+}
+
+
+/**@brief Function for handling Scaning events.
+ *
+ * @param[in]   p_scan_evt   Scanning event.
+ */
+static void scan_evt_handler(scan_evt_t const * p_scan_evt)
+{
+    ret_code_t err_code;
+
+    switch(p_scan_evt->scan_evt_id)
+    {
+        case NRF_BLE_SCAN_EVT_CONNECTING_ERROR:
+            err_code = p_scan_evt->params.connecting_err.err_code;
+            APP_ERROR_CHECK(err_code);
+            break;
+        default:
+          break;
+    }
+}
+
+
+
+/**@brief Function for initializing the button handler module.
+ */
+static void buttons_init(void)
+{
+    ret_code_t err_code;
+
+    //The array must be static because a pointer to it will be saved in the button handler module.
+    static app_button_cfg_t buttons[] =
+    {
+        {LEDBUTTON_BUTTON_PIN, false, BUTTON_PULL, button_event_handler}
+    };
+
+    err_code = app_button_init(buttons, ARRAY_SIZE(buttons),
+                               BUTTON_DETECTION_DELAY);
     APP_ERROR_CHECK(err_code);
 }
-/**
- * @brief Function for application main entry.
- */
-int main(void)
-{
-    uint32_t err_code;
 
-    err_code = NRF_LOG_INIT(NULL);
+
+/**@brief Function for handling database discovery events.
+ *
+ * @details This function is callback function to handle events from the database discovery module.
+ *          Depending on the UUIDs that are discovered, this function should forward the events
+ *          to their respective services.
+ *
+ * @param[in] p_event  Pointer to the database discovery event.
+ */
+static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
+{
+    ble_lbs_on_db_disc_evt(&m_ble_lbs_c, p_evt);
+}
+
+
+/**@brief Database discovery initialization.
+ */
+static void db_discovery_init(void)
+{
+    ble_db_discovery_init_t db_init;
+
+    memset(&db_init, 0, sizeof(db_init));
+
+    db_init.evt_handler  = db_disc_handler;
+    db_init.p_gatt_queue = &m_ble_gatt_queue;
+
+    ret_code_t err_code = ble_db_discovery_init(&db_init);
+    APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for initializing the log.
+ */
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
-
-    gpiote_init();
-    timers_init();
-    ppi_init();
-
-    NRF_LOG_INFO("PPI example started.?!?!?!?!");
-
-    for (;;)
-    {
-
-            NRF_LOG_PROCESS();
-        // idle_state_handle();
-        // nrf_delay_us(3000);        
-    }
 }
 
-/** @} */
+
+/**@brief Function for initializing the timer.
+ */
+static void timer_init(void)
+{
+    ret_code_t err_code = app_timer_init();
+    APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for initializing the Power manager. */
+static void power_management_init(void)
+{
+    ret_code_t err_code;
+    err_code = nrf_pwr_mgmt_init();
+    APP_ERROR_CHECK(err_code);
+}
+
+
+static void scan_init(void)
+{
+    ret_code_t          err_code;
+    nrf_ble_scan_init_t init_scan;
+
+    memset(&init_scan, 0, sizeof(init_scan));
+
+    init_scan.connect_if_match = true;
+    init_scan.conn_cfg_tag     = APP_BLE_CONN_CFG_TAG;
+
+    err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
+    APP_ERROR_CHECK(err_code);
+
+    // Setting filters for scanning.
+    err_code = nrf_ble_scan_filters_enable(&m_scan, NRF_BLE_SCAN_NAME_FILTER, false);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_scan_filter_set(&m_scan, SCAN_NAME_FILTER, m_target_periph_name);
+    APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for initializing the GATT module.
+ */
+static void gatt_init(void)
+{
+    ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for handling the idle state (main loop).
+ *
+ * @details Handle any pending log operation(s), then sleep until the next event occurs.
+ */
+static void idle_state_handle(void)
+{
+    NRF_LOG_FLUSH();
+    nrf_pwr_mgmt_run();
+}
+
+
+int main(void)
+{
+    // Initialize.
+    log_init();
+    timer_init();
+    leds_init();
+    buttons_init();
+    power_management_init();
+    ble_stack_init();
+    scan_init();
+    gatt_init();
+    db_discovery_init();
+    lbs_c_init();
+
+    // Start execution.
+    NRF_LOG_INFO("Blinky CENTRAL example started.");
+    scan_start();
+
+    // Turn on the LED to signal scanning.
+    bsp_board_led_on(CENTRAL_SCANNING_LED);
+
+    // Enter main loop.
+    for (;;)
+    {
+        idle_state_handle();
+    }
+}
