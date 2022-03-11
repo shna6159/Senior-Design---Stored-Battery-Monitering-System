@@ -82,7 +82,7 @@
 #define APP_BLE_OBSERVER_PRIO       3                                   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_SOC_OBSERVER_PRIO       1                                   /**< Applications' SoC observer priority. You shouldn't need to modify this value. */
 
-#define LESC_DEBUG_MODE             0                                   /**< Set to 1 to use LESC debug keys, allows you to use a sniffer to inspect traffic. */
+//#define LESC_DEBUG_MODE             0                                   /**< Set to 1 to use LESC debug keys, allows you to use a sniffer to inspect traffic. */
 
 #define SEC_PARAM_BOND              1                                   /**< Perform bonding. */
 #define SEC_PARAM_MITM              0                                   /**< Man In The Middle protection not required. */
@@ -95,7 +95,8 @@
 
 #define SCAN_DURATION_WITELIST      3000                                /**< Duration of the scanning in units of 10 milliseconds. */
 
-#define TARGET_UUID                 BLE_UUID_HEART_RATE_SERVICE         /**< Target device uuid that application is looking for. */
+#define TARGET_UUID_TEMP                 0x1234         /**< Target device uuid that application is looking for. */
+#define TARGET_UUID_VOLT                 0x1234         /**< Target device uuid that application is looking for. */
 
 
 /*
@@ -887,15 +888,26 @@ static void scan_init(void)
     err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
     APP_ERROR_CHECK(err_code);
 
-    ble_uuid_t uuid =
+    ble_uuid_t uuid_temp =
     {
-        .uuid = TARGET_UUID,
+        .uuid = TARGET_UUID_TEMP,
+        .type = BLE_UUID_TYPE_BLE,
+    };
+
+    ble_uuid_t uuid_volt =
+    {
+        .uuid = TARGET_UUID_VOLT,
         .type = BLE_UUID_TYPE_BLE,
     };
 
     err_code = nrf_ble_scan_filter_set(&m_scan,
                                        SCAN_UUID_FILTER,
-                                       &uuid);
+                                       &uuid_temp);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_scan_filter_set(&m_scan,
+                                       SCAN_UUID_FILTER,
+                                       &uuid_volt);
     APP_ERROR_CHECK(err_code);
 
     if (strlen(m_target_periph_name) != 0)
