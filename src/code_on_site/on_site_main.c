@@ -100,9 +100,9 @@
 #define TARGET_UUID_VOLT                 0x1234         /**< Target device uuid that application is looking for. */
 
 
-/*
 
-/**@brief Macro to unpack 16bit unsigned UUID from octet stream. */
+
+// @brief Macro to unpack 16bit unsigned UUID from octet stream.
 #define UUID16_EXTRACT(DST, SRC) \
     do                           \
     {                            \
