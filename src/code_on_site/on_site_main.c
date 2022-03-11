@@ -71,6 +71,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "nrf_ble_scan.h"
+#include "nrf_ble_gq.h"
 
 #include <stdint.h>
 #include <stdint.h>

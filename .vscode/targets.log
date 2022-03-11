@@ -10,7 +10,7 @@ make.exe all --print-data-base --no-builtin-variables --no-builtin-rules --quest
 make.exe: *** No rule to make target `all'.  Stop.
  
 
-# Make data base, printed on Mon Mar  7 11:47:19 2022
+# Make data base, printed on Thu Mar 10 16:47:42 2022
 
 # Variables
 
@@ -58,7 +58,7 @@ PROGRAMW6432 = C:\Program Files
 # environment
 PROGRAMDATA = C:\ProgramData
 # environment
-VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-a3e74091-3ea7-4da3-b30f-7ba98e6cc005-sock
+VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-bd6b60e8-0f63-46fa-a2af-62f38f31a011-sock
 # environment
 VSCODE_CWD = C:\Users\Nathan Zhao\AppData\Local\Programs\Microsoft VS Code
 # environment
@@ -84,7 +84,7 @@ ELECTRON_RUN_AS_NODE = 1
 # automatic
 %F = $(notdir $%)
 # environment
-CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_8188_BKLDLMXSEPOYBYED
+CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_12568_HKWXTPFFRMKQAEMA
 # environment
 VSCODE_PIPE_LOGGING = true
 # environment
@@ -102,7 +102,7 @@ PUBLIC = C:\Users\Public
 # environment
 VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
 # environment
-VSCODE_CODE_CACHE_PATH = C:\Users\Nathan Zhao\AppData\Roaming\Code\CachedData\b5205cc8eb4fbaa726835538cd82372cc0222d43
+VSCODE_CODE_CACHE_PATH = C:\Users\Nathan Zhao\AppData\Roaming\Code\CachedData\8908a9ca0f221f36507231afb39d2d8d1e182702
 # environment
 APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
 # environment
@@ -142,7 +142,7 @@ PROCESSOR_IDENTIFIER = AMD64 Family 25 Model 33 Stepping 0, AuthenticAMD
 # environment
 OS = Windows_NT
 # environment
-VSCODE_IPC_HOOK = \\.\pipe\42f414906eb092b1a3cc5c124a33592a-1.65.0-main-sock
+VSCODE_IPC_HOOK = \\.\pipe\42f414906eb092b1a3cc5c124a33592a-1.65.1-main-sock
 # environment
 HOMEPATH = \
 # environment
@@ -196,7 +196,7 @@ TERM = cygwin
 # environment
 FPS_BROWSER_APP_PROFILE_STRING = Internet Explorer
 # environment
-VSCODE_PID = 8188
+VSCODE_PID = 12568
 # environment
 USERDOMAIN_ROAMINGPROFILE = DESKTOP-J2GK0MG
 # variable set hash-table stats:
@@ -239,6 +239,7 @@ Makefile:
 #  Implicit rule search has been done.
 #  File does not exist.
 #  File has been updated.
+ 
 #  Failed to be updated.
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
@@ -267,7 +268,6 @@ GNUmakefile:
 #  File has been updated.
 #  Failed to be updated.
 # variable set hash-table stats:
- 
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # files hash-table stats:
@@ -284,6 +284,6 @@ GNUmakefile:
 # strcache free: total = 0 / max = 0 / min = 4096 / avg = 0
  
 
-# Finished Make data base on Mon Mar  7 11:47:19 2022
+# Finished Make data base on Thu Mar 10 16:47:42 2022
 
  
