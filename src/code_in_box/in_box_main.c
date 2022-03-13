@@ -116,6 +116,7 @@ static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Buf
 ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
+                                                     /** RTC Config Characteristic here? */
 
 #define SAADC_CHANNEL 0
 /**@brief Struct that contains pointers to the encoded advertising data. */
@@ -794,7 +795,7 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
             temp_val = false;
         }
         
-        
+        // This is where we would detect a change in the RTC config characteristic?
 
         nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
     }
@@ -892,7 +893,7 @@ int main(void)
 
     // call the rtc configuration
     rtc_config();
-    rtc_start();
+    rtwc_start();
 
 
 
