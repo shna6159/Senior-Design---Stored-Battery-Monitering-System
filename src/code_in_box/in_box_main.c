@@ -22,7 +22,6 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include <math.h>
 #include "nrf_drv_saadc.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_timer.h"
@@ -35,8 +34,10 @@
 #include "nrf_gpio.h"
 #include "nrf_drv_gpiote.h"
 
-#define FREQ_MEASURE_PIN NRF_GPIO_PIN_MAP(0, 11)
-#define output_pin NRF_GPIO_PIN_MAP(0, 12)
+#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(1, 15)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(1, 13)
+
+#define output_pin NRF_GPIO_PIN_MAP(0, 22)
 
 #define TX_POWER_LEVEL 8
 
@@ -133,19 +134,7 @@ static void leds_init(void)
     bsp_board_init(BSP_INIT_LEDS);
 }
 
-// /**@brief Function for the Timer initialization.
-//  *
-//  * @details Initializes the timer module.
-//  */
-static void timers_init(void)
-{
-    // Initialize timer module, making it use the scheduler
 
-    NRF_LOG_DEBUG("TIMER init");
-
-    ret_code_t err_code = app_timer_init();
-    APP_ERROR_CHECK(err_code);
-}
 
 /**@brief Function for the GAP initialization.
  *
@@ -440,6 +429,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
  */
 static void ble_stack_init(void)
 {
+    nrf_sdh_enable_request();
     // Configure the BLE stack using the default settings.
     // Fetch the start address of the application RAM.
     uint32_t ram_start = 0;
@@ -459,51 +449,21 @@ static void ble_stack_init(void)
  * @param  characteristic_value [in] Value being written to the characteristic
  * @param char_handle [in] handle of the characteristic
  */
-void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_handles_t char_handle)
+void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_char_handles_t char_handle)
 {
     ble_gatts_hvx_params_t params;
-    uint16_t len = sizeof(characteristic_value);
+    uint8_t data[2] = { int_val, dec_val};
+        NRF_LOG_DEBUG("Writing the following values to the characteristic %d and %d", data[0], data[1]);
+
+    uint16_t len = sizeof(data);
     memset(&params, 0, sizeof(params));
     params.type = BLE_GATT_HVX_NOTIFICATION;
     params.handle = char_handle.value_handle;
-    params.p_data = &characteristic_value;
+
+    params.p_data = &data[1];
+    params.p_data = &dec_val;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
-}
-
-/**@brief Funtion for the button handler that uses interrupts to check if a button has been pushed
- *
- * @param pin [in] variable which holds the button which the handler is handling
- * @param action [in] variable which stores the action which the button is doing.
- */
-static void button_handler(uint8_t pin, uint8_t action)
-{
-    if (pin == BSP_BUTTON_0)
-    {
-        if (action == APP_BUTTON_PUSH)
-        {
-            bsp_board_led_on(BSP_BOARD_LED_0);
-        }
-        else if (action == APP_BUTTON_RELEASE)
-        {
-            bsp_board_led_off(BSP_BOARD_LED_0);
-        }
-        ble_write_to_characteristic(action, voltage_char_handles);
-    }
-}
-
-/**@brief Function initializing the button and the soft device interrupt handler
- */
-static void button_init(void)
-{
-
-    NRF_LOG_DEBUG("Button INIT");
-
-    nrf_sdh_enable_request();
-    static app_button_cfg_t buttons[] = {
-        {BSP_BUTTON_0, false, BUTTON_PULL, button_handler}};
-    app_button_init(buttons, ARRAY_SIZE(buttons), APP_TIMER_TICKS(50));
-    app_button_enable();
 }
 
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
@@ -585,7 +545,7 @@ static void timer_init()
 {
     NVIC_EnableIRQ(TIMER1_IRQn);
     NVIC_SetPriority(TIMER1_IRQn, APP_IRQ_PRIORITY_LOW);
-    nrf_gpio_cfg_input(FREQ_MEASURE_PIN, NRF_GPIO_PIN_NOPULL);
+    nrf_gpio_cfg_input(TEMP_SENSOR_1, NRF_GPIO_PIN_NOPULL);
 
     NRF_TIMER1->TASKS_STOP = 1;
     NRF_TIMER1->MODE = TIMER_MODE_MODE_Timer;
@@ -628,6 +588,17 @@ static void setup_gpiote_event(uint32_t pin)
 
 static void setup_timer_and_counter_ppi()
 {
+// ret_code_t err_code = nrf_drv_ppi_init();
+// APP_ERROR_CHECK(err_code);
+
+    NRF_PPI->CHEN |= 1 << 0;
+    *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
+    *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
+    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_STOP;
+    NRF_PPI->CHENSET |= 1 << 0;
+
+    NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
+
     NRF_PPI->CHEN |= 1 << 1;
     *(&(NRF_PPI->CH1_EEP)) = (uint32_t)&NRF_GPIOTE->EVENTS_IN[0];
     *(&(NRF_PPI->CH1_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_COUNT;
@@ -642,27 +613,40 @@ static void setup_timer_and_counter_ppi()
     NRF_PPI->CHENSET |= 1 << 2;
 
     NRF_LOG_DEBUG("ppi_gpiote_counter_init_falling");
-
-    NRF_PPI->CHEN |= 1 << 0;
-    *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER1->EVENTS_COMPARE[0];
-    *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
-    *(&(NRF_PPI->FORK[0].TEP)) = (uint32_t)&NRF_TIMER1->TASKS_STOP;
-    NRF_PPI->CHENSET |= 1 << 0;
-
-    NRF_LOG_DEBUG("ppi_timer_stop_counter_init");
 }
 
-uint8_t valid_temp_counter = 0;
-double valid_duty_cycle[80];
+static int decimal_part(double num){
+  int intpart = (int)num;
+  double decpart = num - intpart;
+  int decimal = decpart*100;
+  NRF_LOG_DEBUG("decimal part is %d", decimal);
+  return decimal;
+}
+
+static int exponent_part(double num){
+    int intpart = (int)num;
+      NRF_LOG_DEBUG("int part is %d", intpart);
+    return intpart;
+}
+
+uint16_t valid_temp_counter = 0;
+#define num_periods 1000
+double valid_duty_cycle[num_periods];
+uint16_t frequency = 0;
+double duty_cycle = 0;
+double temperature;
+uint16_t temperature_encoded;
+bool temp_sensor = false;
 
 void TIMER1_IRQHandler(void)
 {
-    if (NRF_TIMER1->EVENTS_COMPARE[0] != 0)
+    NRF_TIMER2->TASKS_STOP;
+    if (NRF_TIMER1->EVENTS_COMPARE[0] == 1)
     {
         NRF_TIMER1->EVENTS_COMPARE[0] = 0;
-        NRF_TIMER2->TASKS_STOP;
 
         int pulse_width = NRF_TIMER1->CC[3] - NRF_TIMER1->CC[2];
+
 
         if ((pulse_width) < 0)
         {
@@ -674,31 +658,52 @@ void TIMER1_IRQHandler(void)
         }
         else
         {
-            uint16_t frequency = NRF_TIMER2->CC[0] * 4 * 100;
-            double duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
+
+            frequency = NRF_TIMER2->CC[0] * 4 * 100;
+            duty_cycle = (double)(frequency) * (pulse_width) / 16000000;
             NRF_TIMER1->TASKS_CLEAR = 1;
             NRF_TIMER2->TASKS_CLEAR = 1;
-
-            if (valid_temp_counter == 80)
+            if (valid_temp_counter == num_periods)
             {
-                NRF_LOG_INFO("cc: %dHz", frequency);
-                frequency = 6124;
+
                 double average_duty_cycle = 0;
-                for (uint8_t i = 0; i < 80; i++)
+                for (uint16_t i = 0; i < num_periods; i++)
                 {
                     average_duty_cycle = average_duty_cycle + valid_duty_cycle[i];
                 }
-                average_duty_cycle = average_duty_cycle / 80;
-                NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-                double temperature = -1.43 * pow(average_duty_cycle, 2) + 214.56 * average_duty_cycle - 68.60;
-                NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
+                average_duty_cycle = average_duty_cycle / num_periods;
+                // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
+                temperature = 6.9;
                 valid_temp_counter = 0;
 
+                int expo = exponent_part(temperature);
+                temperature_encoded = decimal_part(temperature);
+                NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(temperature));
+                
+
+                if(temp_sensor == false){
+                    ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
+                    temp_sensor = true;
+                    ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
+                    setup_gpiote_event(TEMP_SENSOR_2);
+                    setup_timer_and_counter_ppi();
+                }
+                else{
+                    ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
+                    temp_sensor = false;
+                    setup_gpiote_event(TEMP_SENSOR_1);
+                    setup_timer_and_counter_ppi();
+                }
+
+                nrf_delay_ms(10000);
+                NRF_TIMER1->TASKS_START = 1;
+                NRF_TIMER2->TASKS_START = 1;
             }
             else
             {
                 valid_duty_cycle[valid_temp_counter] = duty_cycle;
                 valid_temp_counter += 1;
+                
 
                 NRF_TIMER1->TASKS_START = 1;
                 NRF_TIMER2->TASKS_START = 1;
@@ -718,8 +723,7 @@ int main(void)
     NRF_LOG_FLUSH();
     // power_management_init();
     leds_init();
-    timers_init();
-    button_init();
+
 
     ble_stack_init();
     ble_gap_params_init();
@@ -728,11 +732,14 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
-
+    nrf_gpio_cfg_output(output_pin);
+    nrf_gpio_pin_set(output_pin);
     // temp sensor code
+
+
     timer_init();
     counter_init();
-    setup_gpiote_event(FREQ_MEASURE_PIN);
+    setup_gpiote_event(TEMP_SENSOR_1);
     setup_timer_and_counter_ppi();
 
 
@@ -741,25 +748,25 @@ int main(void)
 
 
     // Start execution.
-    ret_code_t err_code;
-    nrf_saadc_value_t sample;
-    saadc_init();
+    // ret_code_t err_code;
+    // nrf_saadc_value_t sample;
+    // saadc_init();
     ble_advertising_start();
 
-
+// Setting up the RTC
 
     for(;;)
     {
-        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
-        APP_ERROR_CHECK(err_code);
+        // err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
+        // APP_ERROR_CHECK(err_code);
         
-        double V = (double)(((sample * 1.2) / (4095)) * 3);
-        NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
+        // double V = (double)(((sample * 1.2) / (4095)) * 3);
+        // NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
         // NRF_LOG_INFO("sample: %d", V);
         // ble_write_to_characteristic(sample, voltage_char_handles);
         NRF_LOG_FLUSH();
         // bsp_board_led_on(LEDBUTTON_LED);
-        nrf_delay_ms(300);
+        // nrf_delay_ms(300);
         // bsp_board_led_off(LEDBUTTON_LED);
         // nrf_delay_us(3000);        
     }

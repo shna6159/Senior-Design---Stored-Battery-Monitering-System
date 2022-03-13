@@ -7,6 +7,7 @@
     "files.associations": {
         "algorithm": "c",
         "nrf_log.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "nrf_ble_scan.h": "c"
     }
 }

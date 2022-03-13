@@ -71,7 +71,6 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "nrf_ble_scan.h"
-#include "nrf_ble_gq.h"
 
 #include <stdint.h>
 #include <stdint.h>
@@ -96,7 +95,8 @@
 
 #define SCAN_DURATION_WITELIST      3000                                /**< Duration of the scanning in units of 10 milliseconds. */
 
-#define TARGET_UUID_TEMP                 0x1234         /**< Target device uuid that application is looking for. */
+#define TARGET_UUID_TEMP1                0x3456         /**< Target device uuid that application is looking for. */
+#define TARGET_UUID_TEMP2                0x5678         /**< Target device uuid that application is looking for. */
 #define TARGET_UUID_VOLT                 0x1234         /**< Target device uuid that application is looking for. */
 
 
@@ -889,9 +889,15 @@ static void scan_init(void)
     err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
     APP_ERROR_CHECK(err_code);
 
-    ble_uuid_t uuid_temp =
+    ble_uuid_t uuid_temp1 =
     {
-        .uuid = TARGET_UUID_TEMP,
+        .uuid = TARGET_UUID_TEMP1,
+        .type = BLE_UUID_TYPE_BLE,
+    };
+
+    ble_uuid_t uuid_temp2 =
+    {
+        .uuid = TARGET_UUID_TEMP2,
         .type = BLE_UUID_TYPE_BLE,
     };
 
@@ -903,7 +909,12 @@ static void scan_init(void)
 
     err_code = nrf_ble_scan_filter_set(&m_scan,
                                        SCAN_UUID_FILTER,
-                                       &uuid_temp);
+                                       &uuid_temp1);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_scan_filter_set(&m_scan,
+                                       SCAN_UUID_FILTER,
+                                       &uuid_temp2);
     APP_ERROR_CHECK(err_code);
 
     err_code = nrf_ble_scan_filter_set(&m_scan,
@@ -992,6 +1003,7 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Heart Rate collector example started.");
     scanning_start(&erase_bonds);
+
 
     // Enter main loop.
     for (;;)
