@@ -150,6 +150,7 @@ double temperature;
 uint16_t temperature_encoded;
 bool temp_sensor = false;
 int expo;
+int RTC_CONFIG_CHARVAL;
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
@@ -796,8 +797,46 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         }
         
         // This is where we would detect a change in the RTC config characteristic?
+        RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
 
-        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        // Handle different cases. Mapping is as follows:
+        // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
+        switch (RTC_CONFIG_CHARVAL)
+        {
+        case RTC_VAL_IN_SEC: // Default
+
+            nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+            break;
+
+        case 0:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
+            break;
+
+        case 1:
+
+            nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
+            break;
+
+        case 2:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
+            break;
+
+        case 3:
+
+            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+            break;
+
+        case 4:
+
+            nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+            break;
+
+        }
+
+        // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        // Switch case should do the exact same thing as ^ until characteristic reading is implemented
     }
     else
     {
@@ -893,7 +932,7 @@ int main(void)
 
     // call the rtc configuration
     rtc_config();
-    rtwc_start();
+    rtc_start();
 
 
 
