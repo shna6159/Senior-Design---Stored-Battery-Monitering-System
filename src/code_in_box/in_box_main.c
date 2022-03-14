@@ -363,8 +363,22 @@ static void ble_advertising_start(void)
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
+    bsp_board_led_off(LEDBUTTON_LED);
 
-    NRF_LOG_INFO("Advertising Init \n\n");
+    NRF_LOG_INFO("Advertising Start \n\n");
+}
+
+static void ble_advertising_stop(void)
+{
+    ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
+    if(err_code == NRF_SUCCESS)
+    {
+        bsp_board_led_off(ADVERTISING_LED);
+        bsp_board_led_on(LEDBUTTON_LED);
+    }
+    
+
+    NRF_LOG_INFO("Advertising Stop \n\n");
 }
 
 /**@brief Function for handling BLE events.
@@ -760,7 +774,7 @@ static void temp_sensor_measure(void){
 //     nrf_drv_clock_lfclk_request(NULL);
 //     NRF_LOG_DEBUG("Low frequency clock setup");
 // }
-bool temp_val = false;
+bool is_advertising = false;
 // RTC interrupt handler which will be used to handle the interrupt events
 static void rtc_handler(nrfx_rtc_int_type_t int_type)
 {
@@ -778,20 +792,21 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
 
         // temp sensor code
-        timer_init();
-        counter_init();
-        setup_gpiote_event(TEMP_SENSOR_1);
-        setup_timer_and_counter_ppi();
-        temp_sensor_measure();
 
 
-        if(temp_val == false){
+        if(is_advertising == false){
+            timer_init();
+            counter_init();
+            setup_gpiote_event(TEMP_SENSOR_1);
+            setup_timer_and_counter_ppi();
+            temp_sensor_measure();
+
             ble_advertising_start();
-            temp_val = true;
+            is_advertising = true;
         }
         else{
-            sd_ble_gap_adv_stop(m_adv_handle);
-            temp_val = false;
+            ble_advertising_stop();
+            is_advertising = false;
         }
         
         
@@ -887,6 +902,12 @@ int main(void)
     ble_advertising_init();
     ble_connection_params_init();
 
+
+        // timer_init();
+        // counter_init();
+        // setup_gpiote_event(TEMP_SENSOR_1);
+        // setup_timer_and_counter_ppi();
+        // temp_sensor_measure();
     // // call the clock configuration
     // lfclk_config();
 
