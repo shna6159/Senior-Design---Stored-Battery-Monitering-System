@@ -92,7 +92,8 @@ ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characte
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
 
-#define SAADC_CHANNEL 0
+#define SAADC_CHANNEL1 0
+#define SAADC_CHANNEL2 1
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
     {
@@ -545,9 +546,23 @@ void saadc_init(void)
     // err_code = nrf_drv_saadc_init(NULL, saadc_callback);
     APP_ERROR_CHECK(err_code);
     
-    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL, &channel_config);
+    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL1, &channel_config);
     APP_ERROR_CHECK(err_code);
     nrf_drv_saadc_calibrate_offset();
+}
+
+void saadc_sample_write_ble()
+{
+    ret_code_t err_code;
+    nrf_saadc_value_t sample;
+
+    err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+    APP_ERROR_CHECK(err_code);
+    
+    double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
+    NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
+
+    // ble_write_to_characteristic(sample, voltage_char_handles);
 }
 
 /**@brief Function for setting up logs.
@@ -741,8 +756,6 @@ int main(void)
 
 
     // Start execution.
-    ret_code_t err_code;
-    nrf_saadc_value_t sample;
     saadc_init();
     ble_advertising_start();
 
@@ -750,17 +763,9 @@ int main(void)
 
     for(;;)
     {
-        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
-        APP_ERROR_CHECK(err_code);
-        
-        double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
-        NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
-        // NRF_LOG_INFO("sample: %d", V);
-        // ble_write_to_characteristic(sample, voltage_char_handles);
+        saadc_sample_write_ble();
         NRF_LOG_FLUSH();
-        // bsp_board_led_on(LEDBUTTON_LED);
         nrf_delay_ms(300);
-        // bsp_board_led_off(LEDBUTTON_LED);
         // nrf_delay_us(3000);        
     }
 }
