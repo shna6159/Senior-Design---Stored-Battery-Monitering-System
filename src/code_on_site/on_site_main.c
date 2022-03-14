@@ -43,6 +43,9 @@
  * This file contains the source code for a sample heart rate collector.
  */
 
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include "nordic_common.h"
 #include "nrf_sdm.h"
 #include "ble.h"
@@ -72,17 +75,13 @@
 #include "nrf_log_default_backends.h"
 #include "nrf_ble_scan.h"
 
-#include <stdint.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 #define APP_BLE_CONN_CFG_TAG        1                                   /**< A tag identifying the SoftDevice BLE configuration. */
 
 #define APP_BLE_OBSERVER_PRIO       3                                   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_SOC_OBSERVER_PRIO       1                                   /**< Applications' SoC observer priority. You shouldn't need to modify this value. */
 
-//#define LESC_DEBUG_MODE             0                                   /**< Set to 1 to use LESC debug keys, allows you to use a sniffer to inspect traffic. */
+#define LESC_DEBUG_MODE             0                                   /**< Set to 1 to use LESC debug keys, allows you to use a sniffer to inspect traffic. */
 
 #define SEC_PARAM_BOND              1                                   /**< Perform bonding. */
 #define SEC_PARAM_MITM              0                                   /**< Man In The Middle protection not required. */
@@ -95,14 +94,9 @@
 
 #define SCAN_DURATION_WITELIST      3000                                /**< Duration of the scanning in units of 10 milliseconds. */
 
-#define TARGET_UUID_TEMP1                0x3456         /**< Target device uuid that application is looking for. */
-#define TARGET_UUID_TEMP2                0x5678         /**< Target device uuid that application is looking for. */
-#define TARGET_UUID_VOLT                 0x1234         /**< Target device uuid that application is looking for. */
+#define TARGET_UUID              0x1234         /**< Target device uuid that application is looking for. */
 
-
-
-
-// @brief Macro to unpack 16bit unsigned UUID from octet stream.
+/**@brief Macro to unpack 16bit unsigned UUID from octet stream. */
 #define UUID16_EXTRACT(DST, SRC) \
     do                           \
     {                            \
@@ -145,8 +139,8 @@ static ble_gap_scan_params_t const m_scan_param =
 /**@brief Names which the central applications will scan for, and which will be advertised by the peripherals.
  *  if these are set to empty strings, the UUIDs defined below will be used
  */
-static char const m_target_periph_name[] = "";      /**< If you want to connect to a peripheral using a given advertising name, type its name here. */
-static bool is_connect_per_addr = false;            /**< If you want to connect to a peripheral with a given address, set this to true and put the correct address in the variable below. */
+static char const m_target_periph_name[] = "SBMS_in_box";      /**< If you want to connect to a peripheral using a given advertising name, type its name here. */
+static bool is_connect_per_addr = true;            /**< If you want to connect to a peripheral with a given address, set this to true and put the correct address in the variable below. */
 
 static ble_gap_addr_t const m_target_periph_addr =
 {
@@ -281,7 +275,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             APP_ERROR_CHECK(err_code);
 
             if (ble_conn_state_central_conn_count() < NRF_SDH_BLE_CENTRAL_LINK_COUNT)
-            {
+            {   
+                NRF_LOG_INFO("chicken.")
                 scan_start();
             }
         } break;
@@ -889,37 +884,15 @@ static void scan_init(void)
     err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
     APP_ERROR_CHECK(err_code);
 
-    ble_uuid_t uuid_temp1 =
+    ble_uuid_t uuid =
     {
-        .uuid = TARGET_UUID_TEMP1,
-        .type = BLE_UUID_TYPE_BLE,
-    };
-
-    ble_uuid_t uuid_temp2 =
-    {
-        .uuid = TARGET_UUID_TEMP2,
-        .type = BLE_UUID_TYPE_BLE,
-    };
-
-    ble_uuid_t uuid_volt =
-    {
-        .uuid = TARGET_UUID_VOLT,
+        .uuid = TARGET_UUID,
         .type = BLE_UUID_TYPE_BLE,
     };
 
     err_code = nrf_ble_scan_filter_set(&m_scan,
                                        SCAN_UUID_FILTER,
-                                       &uuid_temp1);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_ble_scan_filter_set(&m_scan,
-                                       SCAN_UUID_FILTER,
-                                       &uuid_temp2);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_ble_scan_filter_set(&m_scan,
-                                       SCAN_UUID_FILTER,
-                                       &uuid_volt);
+                                       &uuid);
     APP_ERROR_CHECK(err_code);
 
     if (strlen(m_target_periph_name) != 0)
@@ -983,6 +956,54 @@ void scanning_start(bool * p_erase_bonds)
 }
 
 
+// static void smbs_evt_handler(ble_gatts_hvx_params_t * params)
+// {
+//     //ret_code_t err_code;
+
+//     switch (params->type)
+//     {
+//         case BLE_GATT_HVX_INDICATION:
+//         {
+//             NRF_LOG_DEBUG("temp disc.");
+
+            
+
+//             // Heart rate service discovered. Enable notification of Heart Rate Measurement.
+//             params->type = BLE_GATT_HVX_NOTIFICATION;
+//         } break;
+
+//         case BLE_GATT_HVX_NOTIFICATION:
+//         {
+//             NRF_LOG_INFO("temp = %d.%d", params->p_data[0],params->p_data[1]);
+
+//             // if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
+//             // {
+//             //     uint32_t rr_avg = 0;
+//             //     for (uint32_t i = 0; i < p_hrs_c_evt->params.hrm.rr_intervals_cnt; i++)
+//             //     {
+//             //         rr_avg += p_hrs_c_evt->params.hrm.rr_intervals[i];
+//             //     }
+//             //     rr_avg = rr_avg / p_hrs_c_evt->params.hrm.rr_intervals_cnt;
+//             //     NRF_LOG_DEBUG("rr_interval (avg) = %d.", rr_avg);
+//             // }
+//         } break;
+
+//         default:
+//             break;
+//     }
+// }
+
+// static void smbs_init(void)
+// {
+//     ble_gatts_hvx_params_t smbs_init_obj;
+
+//     smbs_init_obj.value_handle   = smbs_evt_handler;
+    
+
+//     ret_code_t err_code = ble_hrs_c_init(&m_hrs_c, &hrs_c_init_obj);
+//     APP_ERROR_CHECK(err_code);
+// }
+
 int main(void)
 {
     bool erase_bonds;
@@ -998,12 +1019,15 @@ int main(void)
     db_discovery_init();
     hrs_c_init();
     bas_c_init();
+
     scan_init();
 
+    uint16_t service_handle;
+    ble_uuid_t ble_uuid;
+    sd_ble_gattc_char_value_by_uuid_read(m_conn_handle,&ble_uuid,&service_handle);
     // Start execution.
-    NRF_LOG_INFO("Heart Rate collector example started.");
+    NRF_LOG_INFO("bitch");
     scanning_start(&erase_bonds);
-
 
     // Enter main loop.
     for (;;)
@@ -1011,4 +1035,5 @@ int main(void)
         idle_state_handle();
     }
 }
+
 

@@ -8,6 +8,9 @@
         "algorithm": "c",
         "nrf_log.h": "c",
         "types.h": "c",
-        "nrf_ble_scan.h": "c"
+        "nrf_ble_scan.h": "c",
+        "nrf_sdh_ble.h": "c",
+        "ble_advdata.h": "c",
+        "ble.h": "c"
     }
 }

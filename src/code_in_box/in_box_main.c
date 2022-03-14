@@ -268,7 +268,7 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 static void ble_services_init(void)
 {
     // ret_code_t         err_code;
-    nrf_ble_qwr_init_t qwr_init = {0};
+         qwr_init = {0};
 
     // Initialize Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
