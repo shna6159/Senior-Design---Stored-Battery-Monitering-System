@@ -756,10 +756,11 @@ int main(void)
         double V = (double)(((sample * 1.2) / (4095)) * 3);
         NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
         // NRF_LOG_INFO("sample: %d", V);
-        // ble_write_to_characteristic(sample, voltage_char_handles);
+        ble_write_to_characteristic(1, voltage_char_handles);
         NRF_LOG_FLUSH();
         // bsp_board_led_on(LEDBUTTON_LED);
         nrf_delay_ms(300);
+        ble_write_to_characteristic(0, voltage_char_handles);
         // bsp_board_led_off(LEDBUTTON_LED);
         // nrf_delay_us(3000);        
     }

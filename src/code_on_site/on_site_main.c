@@ -158,7 +158,7 @@ static void lbs_c_evt_handler(ble_lbs_c_t * p_lbs_c, ble_lbs_c_evt_t * p_lbs_c_e
         case BLE_LBS_C_EVT_DISCOVERY_COMPLETE:
         {
             ret_code_t err_code;
-
+            NRF_LOG_INFO("Here.");
             err_code = ble_lbs_c_handles_assign(&m_ble_lbs_c,
                                                 p_lbs_c_evt->conn_handle,
                                                 &p_lbs_c_evt->params.peer_db);
@@ -497,6 +497,12 @@ static void idle_state_handle(void)
     NRF_LOG_FLUSH();
     nrf_pwr_mgmt_run();
 }
+
+// Function to read from a characteristic
+// void ble_read_from_characteristic(ble_gatts_char_handles_t char_handle)
+// {
+
+// }
 
 
 int main(void)
