@@ -753,7 +753,7 @@ int main(void)
         err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL, &sample);
         APP_ERROR_CHECK(err_code);
         
-        double V = (double)((sample * 3.002) / (pow(2,11)));
+        double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
         NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
         // NRF_LOG_INFO("sample: %d", V);
         // ble_write_to_characteristic(sample, voltage_char_handles);
