@@ -76,7 +76,8 @@
         0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00 \
     }
 #define UUID_SERVICE 0x1234
-#define UUID_VOLTAGE_CHAR 0x1234
+#define UUID_VOLTAGE_1_CHAR 0x5514
+#define UUID_VOLTAGE_2_CHAR 0x4514
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 
@@ -88,7 +89,8 @@ static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;           /**< Adv
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];            /**< Buffer for storing an encoded advertising set. */
 static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Buffer for storing an encoded scan data. */
 
-ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characteristic */
+ble_gatts_char_handles_t voltage_1_char_handles;     /** Voltage Sensor 1 Characteristic */
+ble_gatts_char_handles_t voltage_2_char_handles;     /** Voltage Sensor 2 Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
 
@@ -217,8 +219,11 @@ static void ble_advertising_init(void)
     add_char_params.read_access = SEC_OPEN;
     add_char_params.cccd_write_access = SEC_OPEN;
 
-    add_char_params.uuid = UUID_VOLTAGE_CHAR;
-    characteristic_add(service_handle, &add_char_params, &voltage_char_handles); // Setup voltage characteristic
+    add_char_params.uuid = UUID_VOLTAGE_1_CHAR;
+    characteristic_add(service_handle, &add_char_params, &voltage_1_char_handles); // Setup voltage characteristic
+
+    add_char_params.uuid = UUID_VOLTAGE_2_CHAR;
+    characteristic_add(service_handle, &add_char_params, &voltage_2_char_handles); // Setup voltage characteristic
 
     add_char_params.uuid = UUID_TEMPERATURE_1_CHAR;
     characteristic_add(service_handle, &add_char_params, &temperature_1_char_handles); // Setup_temperature characteristic
@@ -455,6 +460,19 @@ static void ble_stack_init(void)
     NRF_LOG_INFO("BLE Stack INIT");
 }
 
+static int decimal_part(double num){
+  int intpart = (int)num;
+  double decpart = num - intpart;
+  int decimal = decpart*100;
+  NRF_LOG_DEBUG("decimal part is %d", decimal);
+  return decimal;
+}
+
+static int exponent_part(double num){
+    int intpart = (int)num;
+      NRF_LOG_DEBUG("int part is %d", intpart);
+    return intpart;
+}
 /**@brief Function which writes a value to the characteristic mentioned
  *
  * @param  characteristic_value [in] Value being written to the characteristic
@@ -523,8 +541,8 @@ void saadc_init(void)
     ret_code_t err_code;
     nrf_saadc_channel_config_t channel_config;
     //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
-    channel_config.pin_p      = NRF_SAADC_INPUT_AIN1;
-    channel_config.pin_n      = NRF_SAADC_INPUT_AIN2;
+    channel_config.pin_p      = NRF_SAADC_INPUT_AIN5; // NRF_GPIO_PIN_MAP(0, 29)
+    channel_config.pin_n      = NRF_SAADC_INPUT_AIN7;
     channel_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
     channel_config.acq_time   = NRF_SAADC_ACQTIME_40US;
     channel_config.reference  = NRF_SAADC_REFERENCE_VDD4;
@@ -580,6 +598,7 @@ void saadc_sample_write_ble()
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
     double V = (double)((sample * 3.002) / (pow(2,11)));
     NRF_LOG_INFO( "1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
+    ble_write_to_characteristic(exponent_part(V), decimal_part(V), voltage_1_char_handles);
 
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
     APP_ERROR_CHECK(err_code);
@@ -587,7 +606,8 @@ void saadc_sample_write_ble()
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
     V = (double)((sample * 3.002) / (pow(2,11)));
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
-    // ble_write_to_characteristic(sample, voltage_char_handles);
+    ble_write_to_characteristic(exponent_part(V), decimal_part(V), voltage_2_char_handles);
+
     nrf_delay_ms(1500);
 }
 
