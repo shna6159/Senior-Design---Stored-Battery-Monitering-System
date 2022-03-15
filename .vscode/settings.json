@@ -5,6 +5,7 @@
         "c:\\Users\\Shreeyash Nadella\\Documents\\GitHub\\Senior-Design---Stored-Battery-Monitering-System\\src\\SBMS"
     ],
     "files.associations": {
-        "algorithm": "c"
+        "algorithm": "c",
+        "xutility": "c"
     }
 }

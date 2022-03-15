@@ -460,14 +460,19 @@ static void ble_stack_init(void)
  * @param  characteristic_value [in] Value being written to the characteristic
  * @param char_handle [in] handle of the characteristic
  */
-void ble_write_to_characteristic(uint8_t characteristic_value, ble_gatts_char_handles_t char_handle)
+void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_char_handles_t char_handle)
 {
     ble_gatts_hvx_params_t params;
-    uint16_t len = sizeof(characteristic_value);
+    uint8_t data[2] = { int_val, dec_val};
+        NRF_LOG_DEBUG("Writing the following values to the characteristic %d and %d \n", data[0], data[1]);
+
+    uint16_t len = sizeof(data);
     memset(&params, 0, sizeof(params));
     params.type = BLE_GATT_HVX_NOTIFICATION;
     params.handle = char_handle.value_handle;
-    params.p_data = &characteristic_value;
+
+    params.p_data = &data[1];
+    params.p_data = &dec_val;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
 }
@@ -489,7 +494,7 @@ static void button_handler(uint8_t pin, uint8_t action)
         {
             bsp_board_led_off(BSP_BOARD_LED_0);
         }
-        ble_write_to_characteristic(action, voltage_char_handles);
+        // ble_write_to_characteristic(action, voltage_char_handles);
     }
 }
 
@@ -519,7 +524,7 @@ void saadc_init(void)
     nrf_saadc_channel_config_t channel_config;
     //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
     channel_config.pin_p      = NRF_SAADC_INPUT_AIN1;
-    channel_config.pin_n      = NRF_SAADC_INPUT_AIN5;
+    channel_config.pin_n      = NRF_SAADC_INPUT_AIN2;
     channel_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
     channel_config.acq_time   = NRF_SAADC_ACQTIME_40US;
     channel_config.reference  = NRF_SAADC_REFERENCE_VDD4;
@@ -528,6 +533,17 @@ void saadc_init(void)
     channel_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
     channel_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
     channel_config.burst      = NRF_SAADC_BURST_ENABLED;
+
+    nrf_saadc_channel_config_t channe2_config;
+    channe2_config.pin_p      = NRF_SAADC_INPUT_AIN4;
+    channe2_config.pin_n      = NRF_SAADC_INPUT_AIN5;
+    channe2_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
+    channe2_config.acq_time   = NRF_SAADC_ACQTIME_40US;
+    channe2_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    channe2_config.gain       = NRF_SAADC_GAIN1_4;
+    channe2_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
+    channe2_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
+    channe2_config.burst      = NRF_SAADC_BURST_ENABLED;
 
     // channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
     // channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
@@ -548,6 +564,8 @@ void saadc_init(void)
     
     err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL1, &channel_config);
     APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL2, &channe2_config);
+    APP_ERROR_CHECK(err_code);
     nrf_drv_saadc_calibrate_offset();
 }
 
@@ -559,10 +577,18 @@ void saadc_sample_write_ble()
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
     APP_ERROR_CHECK(err_code);
     
-    double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
-    NRF_LOG_INFO( "Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
+    // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
+    double V = (double)((sample * 3.002) / (pow(2,11)));
+    NRF_LOG_INFO( "1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
 
+    err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
+    APP_ERROR_CHECK(err_code);
+    
+    // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,11)));
+    V = (double)((sample * 3.002) / (pow(2,11)));
+    NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V));
     // ble_write_to_characteristic(sample, voltage_char_handles);
+    nrf_delay_ms(1500);
 }
 
 /**@brief Function for setting up logs.
@@ -765,7 +791,7 @@ int main(void)
     {
         saadc_sample_write_ble();
         NRF_LOG_FLUSH();
-        nrf_delay_ms(300);
+        
         // nrf_delay_us(3000);        
     }
 }
