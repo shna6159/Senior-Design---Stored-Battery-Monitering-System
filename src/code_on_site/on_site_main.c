@@ -1021,10 +1021,6 @@ int main(void)
     bas_c_init();
 
     scan_init();
-
-    uint16_t service_handle;
-    ble_uuid_t ble_uuid;
-    sd_ble_gattc_char_value_by_uuid_read(m_conn_handle,&ble_uuid,&service_handle);
     // Start execution.
     NRF_LOG_INFO("bitch");
     scanning_start(&erase_bonds);
