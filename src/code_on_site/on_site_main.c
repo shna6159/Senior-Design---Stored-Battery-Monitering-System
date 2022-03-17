@@ -115,6 +115,14 @@ NRF_BLE_GATT_DEF(m_gatt);                                           /**< GATT mo
 BLE_DB_DISCOVERY_DEF(m_db_disc);                                    /**< DB discovery module instance. */
 NRF_BLE_SCAN_DEF(m_scan);                                           /**< Scanning module instance. */
 
+#define BLE_SMBS_DEF(_name)                                                                        \
+static ble_gatts_hvx_params_t _name;                                                                           \
+NRF_SDH_BLE_OBSERVER(_name ## _obs,                                                                 \
+                     BLE_HRS_C_BLE_OBSERVER_PRIO,                                                   \
+                     ble_hrs_c_on_ble_evt, &_name)
+
+BLE_SMBS_DEF(m_smbs);
+
 static uint16_t m_conn_handle;                                      /**< Current connection handle. */
 static bool     m_whitelist_disabled;                               /**< True if whitelist has been temporarily disabled. */
 static bool     m_memory_access_in_progress;                        /**< Flag to keep track of ongoing operations on persistent memory. */
@@ -956,58 +964,113 @@ void scanning_start(bool * p_erase_bonds)
 }
 
 
-// static void smbs_evt_handler(ble_gatts_hvx_params_t * params)
-// {
-//     //ret_code_t err_code;
+uint32_t smbs_handles_assign(ble_gatts_hvx_params_t    * smbs,
+                                  uint16_t         conn_handle,
+                                  const uint16_t * smbs_handles)
+{
+    VERIFY_PARAM_NOT_NULL(smbs);
 
-//     switch (params->type)
-//     {
-//         case BLE_GATT_HVX_INDICATION:
-//         {
-//             NRF_LOG_DEBUG("temp disc.");
+    smbs->type = conn_handle;
+    if (smbs_handles != NULL)
+    {
+        smbs->handle = * smbs_handles;
+    }
 
-            
+    return NRF_SUCCESS;
+}
 
-//             // Heart rate service discovered. Enable notification of Heart Rate Measurement.
-//             params->type = BLE_GATT_HVX_NOTIFICATION;
-//         } break;
 
-//         case BLE_GATT_HVX_NOTIFICATION:
-//         {
-//             NRF_LOG_INFO("temp = %d.%d", params->p_data[0],params->p_data[1]);
+static void smbs_evt_handler(ble_gatts_hvx_params_t    * smbs)
+{
+    //ret_code_t err_code;
 
-//             // if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
-//             // {
-//             //     uint32_t rr_avg = 0;
-//             //     for (uint32_t i = 0; i < p_hrs_c_evt->params.hrm.rr_intervals_cnt; i++)
-//             //     {
-//             //         rr_avg += p_hrs_c_evt->params.hrm.rr_intervals[i];
-//             //     }
-//             //     rr_avg = rr_avg / p_hrs_c_evt->params.hrm.rr_intervals_cnt;
-//             //     NRF_LOG_DEBUG("rr_interval (avg) = %d.", rr_avg);
-//             // }
-//         } break;
+    switch (smbs->type)
+    {
+        // case BLE_HRS_C_EVT_DISCOVERY_COMPLETE:
+        // {
+        //     NRF_LOG_DEBUG("Heart rate service discovered.");
 
-//         default:
-//             break;
-//     }
-// }
+        //     err_code = ble_hrs_c_handles_assign(smbs,
+        //                                         smbs->handle,
+        //                                         &p_hrs_c_evt->params.peer_db);
+        //     APP_ERROR_CHECK(err_code);
 
-// static void smbs_init(void)
-// {
-//     ble_gatts_hvx_params_t smbs_init_obj;
+        //     // Heart rate service discovered. Enable notification of Heart Rate Measurement.
+        //     err_code = ble_hrs_c_hrm_notif_enable(p_hrs_c);
+        //     APP_ERROR_CHECK(err_code);
+        // } break;
 
-//     smbs_init_obj.value_handle   = smbs_evt_handler;
-    
+        case BLE_GATT_HVX_NOTIFICATION:
+        {
+            NRF_LOG_INFO("Heart Rate = %d.", smbs->p_data[0]);
 
-//     ret_code_t err_code = ble_hrs_c_init(&m_hrs_c, &hrs_c_init_obj);
-//     APP_ERROR_CHECK(err_code);
-// }
+            // if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
+            // {
+            //     uint32_t rr_avg = 0;
+            //     for (uint32_t i = 0; i < p_hrs_c_evt->params.hrm.rr_intervals_cnt; i++)
+            //     {
+            //         rr_avg += p_hrs_c_evt->params.hrm.rr_intervals[i];
+            //     }
+            //     rr_avg = rr_avg / p_hrs_c_evt->params.hrm.rr_intervals_cnt;
+            //     NRF_LOG_DEBUG("rr_interval (avg) = %d.", rr_avg);
+            // }
+        } break;
+
+        default:
+            break;
+    }
+}
+
+typedef void (* smbs_evt_handler_t) (ble_gatts_hvx_params_t * p_ble_hrs_c);
+
+typedef struct
+{
+    smbs_evt_handler_t   evt_handler;   /**< Event handler to be called by the Heart Rate Client module when there is an event related to the Heart Rate Service. */
+    ble_srv_error_handler_t   error_handler; /**< Function to be called in case of an error. */
+    nrf_ble_gq_t            * p_gatt_queue;  /**< Pointer to the BLE GATT Queue instance. */
+} smbs_init_t;
+
+uint32_t ble_smbs_init(ble_gatts_hvx_params_t * p_ble_hrs_c, smbs_init_t * p_ble_hrs_c_init)
+{
+    VERIFY_PARAM_NOT_NULL(p_ble_hrs_c);
+    VERIFY_PARAM_NOT_NULL(p_ble_hrs_c_init);
+
+    ble_uuid_t hrs_uuid;
+
+    hrs_uuid.type = BLE_UUID_TYPE_BLE;
+    hrs_uuid.uuid = 0x1234;
+
+    //p_ble_hrs_c->handle                 = p_ble_hrs_c_init->evt_handler;
+    //p_ble_hrs_c->error_handler               = p_ble_hrs_c_init->error_handler;
+    //p_ble_hrs_c->p_gatt_queue                = p_ble_hrs_c_init->p_gatt_queue;
+    //p_ble_hrs_c->conn_handle                 = BLE_CONN_HANDLE_INVALID;
+    //p_ble_hrs_c->peer_hrs_db.hrm_cccd_handle = BLE_GATT_HANDLE_INVALID;
+    //p_ble_hrs_c->peer_hrs_db.hrm_handle      = BLE_GATT_HANDLE_INVALID;
+    if(ble_db_discovery_evt_register(&hrs_uuid) == NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("found uuid");
+    }
+ 
+    return ble_db_discovery_evt_register(&hrs_uuid);
+}
+
+
+
+static void smbs_init(void)
+{
+    smbs_init_t hrs_c_init_obj;
+
+    hrs_c_init_obj.evt_handler   = smbs_evt_handler;
+    hrs_c_init_obj.error_handler = NULL;
+    hrs_c_init_obj.p_gatt_queue  = NULL;
+
+    ret_code_t err_code = ble_smbs_init(&m_smbs, &hrs_c_init_obj);
+    APP_ERROR_CHECK(err_code);
+}
 
 int main(void)
 {
     bool erase_bonds;
-
     // Initialize.
     log_init();
     timer_init();
@@ -1019,10 +1082,11 @@ int main(void)
     db_discovery_init();
     hrs_c_init();
     bas_c_init();
+    smbs_init();
 
     scan_init();
     // Start execution.
-    NRF_LOG_INFO("bitch");
+    NRF_LOG_INFO("bitch please work test....");
     scanning_start(&erase_bonds);
 
     // Enter main loop.
