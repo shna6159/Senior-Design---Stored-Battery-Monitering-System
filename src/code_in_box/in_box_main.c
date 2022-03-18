@@ -61,7 +61,7 @@
 #define APP_BLE_CONN_CFG_TAG 1    /**< A tag identifying the SoftDevice BLE configuration. */
 
 #define APP_ADV_INTERVAL 64                                    /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
-#define APP_ADV_DURATION BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
+#define APP_ADV_DURATION 500 /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
 
 #define MIN_CONN_INTERVAL MSEC_TO_UNITS(100, UNIT_1_25_MS) /**< Minimum acceptable connection interval (0.5 seconds). */
 #define MAX_CONN_INTERVAL MSEC_TO_UNITS(200, UNIT_1_25_MS) /**< Maximum acceptable connection interval (1 second). */
@@ -360,6 +360,7 @@ static void ble_connection_params_init(void)
  */
 static void ble_advertising_start(void)
 {
+    ble_advertising_init();
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
@@ -371,6 +372,7 @@ static void ble_advertising_start(void)
 static void ble_advertising_stop(void)
 {
     ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
+    APP_ERROR_CHECK(err_code);
     if(err_code == NRF_SUCCESS)
     {
         bsp_board_led_off(ADVERTISING_LED);
@@ -411,7 +413,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         // err_code = app_button_disable();
         // APP_ERROR_CHECK(err_code);
-        ble_advertising_start();
+        // ble_advertising_start();
         break;
 
         // case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
@@ -616,9 +618,6 @@ static void setup_gpiote_event(uint32_t pin)
 
 static void setup_timer_and_counter_ppi()
 {
-// ret_code_t err_code = nrf_drv_ppi_init();
-// APP_ERROR_CHECK(err_code);
-
     NRF_PPI->CHEN |= 1 << 0;
     *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER3->EVENTS_COMPARE[0];
     *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
@@ -729,6 +728,10 @@ void TIMER3_IRQHandler(void)
                     NRF_TIMER2->CC[0] = 0;
                     NRF_TIMER3->CC[2] = 0;
                     NRF_TIMER3->CC[3] = 0;
+            ble_advertising_start();
+            // nrf_delay_ms(7000);
+            // ble_advertising_stop();
+
                 }
 
                 // nrf_delay_ms(10000);
@@ -903,11 +906,6 @@ int main(void)
     ble_connection_params_init();
 
 
-        // timer_init();
-        // counter_init();
-        // setup_gpiote_event(TEMP_SENSOR_1);
-        // setup_timer_and_counter_ppi();
-        // temp_sensor_measure();
     // // call the clock configuration
     // lfclk_config();
 
@@ -915,7 +913,7 @@ int main(void)
     rtc_config();
     rtc_start();
 
-
+    
 
     // Sleep in the while loop until an event is generated
     while (true)
