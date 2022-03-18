@@ -268,7 +268,7 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 static void ble_services_init(void)
 {
     // ret_code_t         err_code;
-         qwr_init = {0};
+    nrf_ble_qwr_init_t qwr_init = {0};
 
     // Initialize Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
@@ -342,6 +342,7 @@ static void ble_advertising_start(void)
 
     NRF_LOG_INFO("Advertising Init");
 }
+
 
 /**@brief Function for handling BLE events.
  *
@@ -673,7 +674,7 @@ void TIMER1_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / num_periods;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-                temperature = 6.9;
+                temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
                 valid_temp_counter = 0;
 
                 int expo = exponent_part(temperature);
@@ -684,7 +685,6 @@ void TIMER1_IRQHandler(void)
                 if(temp_sensor == false){
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
                     temp_sensor = true;
-                    ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     setup_gpiote_event(TEMP_SENSOR_2);
                     setup_timer_and_counter_ppi();
                 }
@@ -753,7 +753,7 @@ int main(void)
     // saadc_init();
     ble_advertising_start();
 
-// Setting up the RTC
+
 
     for(;;)
     {

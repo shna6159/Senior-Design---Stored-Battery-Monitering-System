@@ -115,14 +115,6 @@ NRF_BLE_GATT_DEF(m_gatt);                                           /**< GATT mo
 BLE_DB_DISCOVERY_DEF(m_db_disc);                                    /**< DB discovery module instance. */
 NRF_BLE_SCAN_DEF(m_scan);                                           /**< Scanning module instance. */
 
-#define BLE_SMBS_DEF(_name)                                                                        \
-static ble_gatts_hvx_params_t _name;                                                                           \
-NRF_SDH_BLE_OBSERVER(_name ## _obs,                                                                 \
-                     BLE_HRS_C_BLE_OBSERVER_PRIO,                                                   \
-                     ble_hrs_c_on_ble_evt, &_name)
-
-BLE_SMBS_DEF(m_smbs);
-
 static uint16_t m_conn_handle;                                      /**< Current connection handle. */
 static bool     m_whitelist_disabled;                               /**< True if whitelist has been temporarily disabled. */
 static bool     m_memory_access_in_progress;                        /**< Flag to keep track of ongoing operations on persistent memory. */
@@ -259,6 +251,11 @@ static bool shutdown_handler(nrf_pwr_mgmt_evt_t event)
 NRF_PWR_MGMT_HANDLER_REGISTER(shutdown_handler, APP_SHUTDOWN_HANDLER_PRIORITY);
 
 
+static void sbms_reader(ble_evt_t const *p_ble_evt)
+{
+    NRF_LOG_INFO("temp is %d.%d",p_ble_evt->evt.gattc_evt.params.hvx.data[1],p_ble_evt->evt.gattc_evt.params.hvx.data[2]);
+}
+
 /**@brief Function for handling BLE events.
  *
  * @param[in]   p_ble_evt   Bluetooth stack event.
@@ -274,7 +271,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         case BLE_GAP_EVT_CONNECTED:
         {
             NRF_LOG_INFO("Connected.");
-
+            sbms_reader(p_ble_evt);
             // Discover peer's services.
             err_code = ble_db_discovery_start(&m_db_disc, p_ble_evt->evt.gap_evt.conn_handle);
             APP_ERROR_CHECK(err_code);
@@ -282,11 +279,6 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             APP_ERROR_CHECK(err_code);
 
-            if (ble_conn_state_central_conn_count() < NRF_SDH_BLE_CENTRAL_LINK_COUNT)
-            {   
-                NRF_LOG_INFO("chicken.")
-                scan_start();
-            }
         } break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -964,7 +956,7 @@ void scanning_start(bool * p_erase_bonds)
 }
 
 
-uint32_t smbs_handles_assign(ble_gatts_hvx_params_t    * smbs,
+uint32_t smbs_handles_assign(ble_gattc_evt_hvx_t    * smbs,
                                   uint16_t         conn_handle,
                                   const uint16_t * smbs_handles)
 {
@@ -980,11 +972,11 @@ uint32_t smbs_handles_assign(ble_gatts_hvx_params_t    * smbs,
 }
 
 
-static void smbs_evt_handler(ble_gatts_hvx_params_t    * smbs)
+static void smbs_evt_handler(ble_gatts_hvx_params_t * smbs,ble_gattc_evt_hvx_t smbs_evt_handler)
 {
     //ret_code_t err_code;
 
-    switch (smbs->type)
+    switch (smbs_evt_handler.type)
     {
         // case BLE_HRS_C_EVT_DISCOVERY_COMPLETE:
         // {
@@ -1002,7 +994,7 @@ static void smbs_evt_handler(ble_gatts_hvx_params_t    * smbs)
 
         case BLE_GATT_HVX_NOTIFICATION:
         {
-            NRF_LOG_INFO("Heart Rate = %d.", smbs->p_data[0]);
+            NRF_LOG_INFO("Heart Rate = %d.%d", smbs->p_data[0],smbs->p_data[1]);
 
             // if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
             // {
@@ -1021,11 +1013,12 @@ static void smbs_evt_handler(ble_gatts_hvx_params_t    * smbs)
     }
 }
 
-typedef void (* smbs_evt_handler_t) (ble_gatts_hvx_params_t * p_ble_hrs_c);
+typedef void (* smbs_evt_handler_t) (ble_gatts_hvx_params_t * p_ble_hrs_c,ble_gattc_evt_hvx_t smbs_evt_handler);
 
 typedef struct
 {
-    smbs_evt_handler_t   evt_handler;   /**< Event handler to be called by the Heart Rate Client module when there is an event related to the Heart Rate Service. */
+    ble_gattc_evt_hvx_t char_evt;
+    smbs_evt_handler_t  evt_handler;   /**< Event handler to be called by the Heart Rate Client module when there is an event related to the Heart Rate Service. */
     ble_srv_error_handler_t   error_handler; /**< Function to be called in case of an error. */
     nrf_ble_gq_t            * p_gatt_queue;  /**< Pointer to the BLE GATT Queue instance. */
 } smbs_init_t;
@@ -1037,10 +1030,10 @@ uint32_t ble_smbs_init(ble_gatts_hvx_params_t * p_ble_hrs_c, smbs_init_t * p_ble
 
     ble_uuid_t hrs_uuid;
 
-    hrs_uuid.type = BLE_UUID_TYPE_BLE;
+    hrs_uuid.type = BLE_GATTS_SRVC_TYPE_PRIMARY;
     hrs_uuid.uuid = 0x1234;
 
-    //p_ble_hrs_c->handle                 = p_ble_hrs_c_init->evt_handler;
+    p_ble_hrs_c->handle                 = p_ble_hrs_c_init->char_evt.handle;
     //p_ble_hrs_c->error_handler               = p_ble_hrs_c_init->error_handler;
     //p_ble_hrs_c->p_gatt_queue                = p_ble_hrs_c_init->p_gatt_queue;
     //p_ble_hrs_c->conn_handle                 = BLE_CONN_HANDLE_INVALID;
@@ -1048,13 +1041,100 @@ uint32_t ble_smbs_init(ble_gatts_hvx_params_t * p_ble_hrs_c, smbs_init_t * p_ble
     //p_ble_hrs_c->peer_hrs_db.hrm_handle      = BLE_GATT_HANDLE_INVALID;
     if(ble_db_discovery_evt_register(&hrs_uuid) == NRF_SUCCESS)
     {
-        NRF_LOG_INFO("found uuid");
+        NRF_LOG_INFO("found %d",hrs_uuid.uuid);
     }
  
     return ble_db_discovery_evt_register(&hrs_uuid);
 }
 
+#define HRM_FLAG_MASK_HR_16BIT  (0x01 << 0)           /**< Bit mask used to extract the type of heart rate value. This is used to find if the received heart rate is a 16 bit value or an 8 bit value. */
 
+static void on_hvx(ble_gatts_hvx_params_t * p_ble_hrs_c, const ble_evt_t * p_ble_evt)
+{
+    // Check if the event is on the link for this instance.
+    if (p_ble_hrs_c->handle != p_ble_evt->evt.gattc_evt.conn_handle)
+    {
+        NRF_LOG_DEBUG("Received HVX on link 0x%x, not associated to this instance. Ignore.",
+                      p_ble_evt->evt.gattc_evt.conn_handle);
+        return;
+    }
+
+    NRF_LOG_DEBUG("Received HVX on link 0x%x",
+    p_ble_evt->evt.gattc_evt.params.hvx.handle);
+
+    // Check if this is a heart rate notification.
+    if (p_ble_evt->evt.gattc_evt.params.hvx.handle == p_ble_hrs_c->handle)
+    {
+        ble_gattc_evt_hvx_t ble_hrs_c_evt;
+        uint32_t        index = 0;
+
+        ble_hrs_c_evt.type                    = BLE_HRS_C_EVT_HRM_NOTIFICATION;
+        ble_hrs_c_evt.handle                 = p_ble_hrs_c->handle;
+        //ble_hrs_c_evt.params.hrm.rr_intervals_cnt = 0;
+
+        if (!(p_ble_evt->evt.gattc_evt.params.hvx.data[index++] & HRM_FLAG_MASK_HR_16BIT))
+        {
+            // 8-bit heart rate value received.
+            ble_hrs_c_evt.data[1] = p_ble_evt->evt.gattc_evt.params.hvx.data[index++];  //lint !e415 suppress Lint Warning 415: Likely access out of bond
+        }
+        else
+        {
+            // 16-bit heart rate value received.
+            ble_hrs_c_evt.data[1] =
+                uint16_decode(&(p_ble_evt->evt.gattc_evt.params.hvx.data[index]));
+            index += sizeof(uint16_t);
+        }
+
+        // if ((p_ble_evt->evt.gattc_evt.params.hvx.data[0] & HRM_FLAG_MASK_HR_RR_INT))
+        // {
+        //     uint32_t i;
+        //     /*lint --e{415} --e{416} --e{662} --e{661} -save suppress Warning 415: possible access out of bond */
+        //     for (i = 0; i < BLE_HRS_C_RR_INTERVALS_MAX_CNT; i ++)
+        //     {
+        //         if (index >= p_ble_evt->evt.gattc_evt.params.hvx.len)
+        //         {
+        //             break;
+        //         }
+        //         ble_hrs_c_evt.params.hrm.rr_intervals[i] =
+        //             uint16_decode(&(p_ble_evt->evt.gattc_evt.params.hvx.data[index]));
+        //         index += sizeof(uint16_t);
+        //     }
+        //     /*lint -restore*/
+        //     ble_hrs_c_evt.params.hrm.rr_intervals_cnt = (uint8_t)i;
+        // }
+        //p_ble_hrs_c->evt_handler(p_ble_hrs_c, &ble_hrs_c_evt);
+        smbs_evt_handler(p_ble_hrs_c, ble_hrs_c_evt);
+    }
+}
+
+
+void sbms_on_ble_evt(ble_evt_t const * p_ble_evt, void * p_context)
+{
+    ble_gatts_hvx_params_t * p_ble_hrs_c = (ble_gatts_hvx_params_t *)p_context;
+
+    if ((p_ble_hrs_c == NULL) || (p_ble_evt == NULL))
+    {
+        return;
+    }
+
+    switch (p_ble_evt->header.evt_id)
+    {
+        case BLE_GATTC_EVT_HVX:
+            on_hvx(p_ble_hrs_c, p_ble_evt);
+            break;
+        default:
+            break;
+    }
+}
+
+
+#define BLE_SMBS_DEF(_name)                                                                        \
+static ble_gatts_hvx_params_t _name;                                                                           \
+NRF_SDH_BLE_OBSERVER(_name ## _obs,                                                                 \
+                     BLE_HRS_C_BLE_OBSERVER_PRIO,                                                   \
+                     sbms_on_ble_evt, &_name)
+
+BLE_SMBS_DEF(m_sbms);
 
 static void smbs_init(void)
 {
@@ -1064,7 +1144,7 @@ static void smbs_init(void)
     hrs_c_init_obj.error_handler = NULL;
     hrs_c_init_obj.p_gatt_queue  = NULL;
 
-    ret_code_t err_code = ble_smbs_init(&m_smbs, &hrs_c_init_obj);
+    ret_code_t err_code = ble_smbs_init(&m_sbms, &hrs_c_init_obj);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -1086,7 +1166,7 @@ int main(void)
 
     scan_init();
     // Start execution.
-    NRF_LOG_INFO("bitch please work test....");
+    NRF_LOG_INFO("bitch ");
     scanning_start(&erase_bonds);
 
     // Enter main loop.
