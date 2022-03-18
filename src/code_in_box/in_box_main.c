@@ -44,8 +44,8 @@
 //                                      DEFINES
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
-#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(0, 11)
-#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 11)
+#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(1, 15)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(1, 13)
 #define output_pin NRF_GPIO_PIN_MAP(0, 12)
 #define output_pin1 NRF_GPIO_PIN_MAP(0, 13)
 #define output_pin2 NRF_GPIO_PIN_MAP(0, 15)
@@ -98,7 +98,7 @@
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
-#define RTC_VAL_IN_SEC  (20UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define RTC_VAL_IN_SEC  (5UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
 
 #define SAADC_CHANNEL1 0
@@ -545,6 +545,7 @@ static int exponent_part(double num){
 // Init output pins
 void output_pin_init()
 {
+    nrf_gpio_cfg_output(output_pin);
      nrf_gpio_cfg_output(output_pin1);
      nrf_gpio_cfg_output(output_pin2);
      nrf_gpio_cfg_output(output_pin3);
@@ -553,9 +554,10 @@ void output_pin_init()
     //  nrf_gpio_cfg_output(output_pin6);
      nrf_gpio_cfg_output(output_pin7);
 
-     nrf_gpio_pin_set(output_pin1); 
+    nrf_gpio_pin_set(output_pin); 
+    //  nrf_gpio_pin_set(output_pin1); 
      nrf_gpio_pin_set(output_pin2); 
-     nrf_gpio_pin_set(output_pin3); 
+    //  nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
      nrf_gpio_pin_set(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
@@ -646,7 +648,9 @@ void saadc_sample_write_ble()
     // double V = (double)((sample * 3.002) / (pow(2,12)));
     double V1 = (double)((sample * 3.335) / (pow(2,12)));
     V1 *= (1.118/0.118);
-    NRF_LOG_INFO( "1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
+    double div = 0.96 + ((V1-19)*(0.04)/(14));
+    V1 *= 1/div;
+    NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
     ble_write_to_characteristic(exponent_part(V1), decimal_part(V1), voltage_1_char_handles);
 
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
@@ -658,6 +662,8 @@ void saadc_sample_write_ble()
     V2 *= (14/11);
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
+
+    nrf_delay_ms(1000);
 }
 
 //------------------------------------------------------------------------------------------
@@ -947,7 +953,7 @@ int main(void)
     NRF_LOG_FLUSH();
     leds_init();
     output_pin_init();
-
+    saadc_init();
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
