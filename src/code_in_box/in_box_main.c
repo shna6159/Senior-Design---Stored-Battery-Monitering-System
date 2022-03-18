@@ -549,12 +549,16 @@ void output_pin_init()
      nrf_gpio_cfg_output(output_pin2);
      nrf_gpio_cfg_output(output_pin3);
      nrf_gpio_cfg_output(output_pin4);
+     nrf_gpio_cfg_output(output_pin5);
+    //  nrf_gpio_cfg_output(output_pin6);
      nrf_gpio_cfg_output(output_pin7);
 
      nrf_gpio_pin_set(output_pin1); 
      nrf_gpio_pin_set(output_pin2); 
      nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
+     nrf_gpio_pin_set(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
      nrf_gpio_pin_set(output_pin7);
 }
 
