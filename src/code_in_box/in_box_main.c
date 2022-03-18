@@ -367,7 +367,7 @@ static void ble_connection_params_init(void)
  */
 static void ble_advertising_start(void)
 {
-    ble_advertising_init();
+    // ble_advertising_init();
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
