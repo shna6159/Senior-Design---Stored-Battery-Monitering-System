@@ -382,6 +382,7 @@ static void ble_advertising_start(void)
     NRF_LOG_INFO("Advertising Start \n\n");
 }
 
+<<<<<<< HEAD
 // static void ble_advertising_stop(void)
 // {
 //     ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
@@ -395,6 +396,8 @@ static void ble_advertising_start(void)
 
 //     NRF_LOG_INFO("Advertising Stop \n\n");
 // }
+=======
+>>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
 
 /**@brief Function for handling BLE events.
  *
@@ -796,7 +799,11 @@ void TIMER3_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
+<<<<<<< HEAD
                 temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
+=======
+                temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
+>>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
                 valid_temp_counter = 0;
 
                 expo = exponent_part(temperature);
@@ -971,8 +978,24 @@ int main(void)
 
     
 
+<<<<<<< HEAD
     // Sleep in the while loop until an event is generated
     while (true)
+=======
+    NRF_TIMER1->TASKS_START = 1;
+    NRF_TIMER2->TASKS_START = 1;
+
+
+    // Start execution.
+    // ret_code_t err_code;
+    // nrf_saadc_value_t sample;
+    // saadc_init();
+    ble_advertising_start();
+
+
+
+    for(;;)
+>>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
     {
         NRF_LOG_FLUSH();
         // __SEV();
