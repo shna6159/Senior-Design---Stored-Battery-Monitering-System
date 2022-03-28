@@ -89,6 +89,7 @@
 #define UUID_VOLTAGE_CHAR 0x1234
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
+#define UUID_RTC_CONFIG_CHAR 0x9123
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
 #define RTC_VAL_IN_SEC  (20UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
@@ -116,7 +117,8 @@ static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Buf
 ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
-                                                     /** RTC Config Characteristic here? */
+ble_gatts_char_handles_t rtc_config_char_handles;    /** RTC Config Characteristic here? */
+                                                     
 
 #define SAADC_CHANNEL 0
 /**@brief Struct that contains pointers to the encoded advertising data. */
@@ -239,6 +241,8 @@ static void ble_advertising_init(void)
     add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
     characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles); // Setup_temperature characteristic
 
+    add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
+    characteristic_add(service_handle, &add_char_params, &rtc_config_char_handles); // setup_rtc_config characteristic
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
 
     // Build and set advertising data.
@@ -490,6 +494,17 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
     params.p_data = &dec_val;
     params.p_len = &len;
     sd_ble_gatts_hvx(m_conn_handle, &params);
+}
+
+/**@brief Function to read a value from the characteristic mentiond. Possibly not necessary?
+ *
+ * @param  characteristic_value [in] Value being written to the characteristic
+ * @param char_handle [in] handle of the characteristic
+ */
+int ble_read_from_characteristic(ble_gatts_char_handles_t char_handle)
+{
+  return 0;
+  // Return an int of some config
 }
 
 //------------------------------------------------------------------------------------------
@@ -797,6 +812,7 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         }
         
         // This is where we would detect a change in the RTC config characteristic?
+        // RTC_CONFIG_CHARVAL = ble_read_from_characteristic(rtc_config_char_handles)
         RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
 
         // Handle different cases. Mapping is as follows:
