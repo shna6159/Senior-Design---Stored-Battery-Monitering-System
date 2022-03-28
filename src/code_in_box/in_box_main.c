@@ -962,4 +962,3 @@ int main(void)
         nrf_pwr_mgmt_run();
     }
 }
-
