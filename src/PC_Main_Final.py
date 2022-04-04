@@ -153,14 +153,17 @@ class GUI(tk.Tk):
                 print("WUT")
 
             # Getting Values
-            time.sleep(20)
             if serialcomm.inWaiting():    
                 string = serialcomm.readline().decode('ascii').strip()
                 arr = string.split(',')
-                temp_str = arr[0]
-                temp = float(temp_str)
-                volt_str = arr[1]
+                temp_str1 = arr[0]
+                temp1 = float(temp_str1)
+                temp_str2 = arr[1]
+                temp2 = float(temp_str2)
+                volt_str = arr[2]
                 volt = float(volt_str)
+                Batt_Life_str = arr[3]
+                Batt_Life = float(Batt_Life_str)
 
                 ##### Write data to text file
                 ts = datetime.datetime.now()
@@ -172,7 +175,7 @@ class GUI(tk.Tk):
                 f = open(file, 'a')
                 if os.stat(file).st_size == 0:
                     f.write(header)
-                f.write(t + "\t" + temp_str + "\t" + volt_str + "\n")
+                f.write(t + "\t" + temp_str1 + "\t" + temp_str2 + "\t" + volt_str + "\n")
                 f.close()
 
                 #Display file in GUI
@@ -203,16 +206,49 @@ class GUI(tk.Tk):
                 # Write Interval to dongle
                 serialcomm.write(interval.encode())
 
-                # Sending Alert Email
-                if temp > root.temp_High_User or root.temp_Low_User > temp or volt > root.volt_High_User or root.volt_Low_User > volt:
+                # Sending Alert Email Temp
+                if temp1 > root.temp_High_User or root.temp_Low_User > temp1 or temp2 > root.temp_High_User or root.temp_Low_User > temp2:
                     port = 465  # For SSL
                     smtp_server = "smtp.gmail.com"
                     sender_email = "sbmsalertsystem@gmail.com"
                     password = "sbmspassword1!"
 
-                    msg = MIMEText('Battery is in Danger')
+                    msg = MIMEText('Battery temperature is out of range')
 
-                    msg['Subject'] = 'SBMS Alert System Test'
+                    msg['Subject'] = 'SBMS Alert System: Temperature Alert'
+
+                    context = ssl.create_default_context()
+                    with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
+                        server.login(sender_email, password)
+                        server.sendmail(sender_email, gui.receiver_email, msg.as_string())
+
+                # Sending Alert Email for Volt
+                if volt > root.volt_High_User or root.volt_Low_User > volt:
+                    port = 465  # For SSL
+                    smtp_server = "smtp.gmail.com"
+                    sender_email = "sbmsalertsystem@gmail.com"
+                    password = "sbmspassword1!"
+
+                    msg = MIMEText('Battery voltage is out of range')
+
+                    msg['Subject'] = 'SBMS Alert System: Voltage Alert'
+
+                    context = ssl.create_default_context()
+                    with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
+                        server.login(sender_email, password)
+                        server.sendmail(sender_email, gui.receiver_email, msg.as_string())
+                
+
+                # Sending Alert Email Battery Life
+                if Batt_Life < 3:
+                    port = 465  # For SSL
+                    smtp_server = "smtp.gmail.com"
+                    sender_email = "sbmsalertsystem@gmail.com"
+                    password = "sbmspassword1!"
+
+                    msg = MIMEText('SBMS Battery is Low.  Please Charge')
+
+                    msg['Subject'] = 'SBMS Alert System: Battery Life Alert'
 
                     context = ssl.create_default_context()
                     with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
