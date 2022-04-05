@@ -21,7 +21,6 @@
 #include "nrf_delay.h"
 #include "math.h"
 
-
 #include "nrf_drv_clock.h"
 #include "nrf_drv_rtc.h"
 
@@ -527,6 +526,22 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
 //                                      PROCEDURES - MISC
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
+// /**
+//  * @brief Function for configuration of REGOUT0 register.
+//  */
+// void vddInit(void)
+// {
+//   if (NRF_UICR->REGOUT0 != UICR_REGOUT0_VOUT_3V3) 
+//   {
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;    //write enable
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+// 	NRF_UICR->REGOUT0 = UICR_REGOUT0_VOUT_3V3;                        //configurate REGOUT0
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+//         NVIC_SystemReset();                                               // Reset device
+//   } 
+// }
+
 static int decimal_part(double num){
   int intpart = (int)num;
   double decpart = num - intpart;
@@ -593,6 +608,7 @@ static void log_init(void)
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
 }
+
 /**
  * @brief Function for confguring SAADC channel 0 for sampling AIN0 (P0.02).
  */
@@ -607,10 +623,14 @@ void saadc_init()
     saadc_config.oversample = NRF_SAADC_OVERSAMPLE_DISABLED;
     saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
 	
-    nrf_saadc_channel_config_t channel_1_config =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN5);
+    nrf_saadc_channel_config_t channel_1_config;
+    //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
+    channel_1_config.pin_p      = NRF_SAADC_INPUT_AIN5; // NRF_GPIO_PIN_MAP(0, 29)
+    channel_1_config.pin_n      = NRF_SAADC_INPUT_AIN0;
+    channel_1_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
     channel_1_config.acq_time   = NRF_SAADC_ACQTIME_40US;
     channel_1_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    // channel_1_config.gain       = NRF_SAADC_GAIN1_6;
     channel_1_config.gain       = NRF_SAADC_GAIN1_4;
     channel_1_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
     channel_1_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
@@ -641,25 +661,31 @@ void saadc_sample_write_ble()
     ret_code_t err_code;
     nrf_saadc_value_t sample;
 
+    // for(int i = 0; i < 10; i++)
+    // {
+
+    // }
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
     APP_ERROR_CHECK(err_code);
     
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V = (double)((sample * 3.002) / (pow(2,12)));
-    double V1 = (double)((sample * 3.335) / (pow(2,12)));
-    V1 *= (1.118/0.118);
-    double div = 0.96 + ((V1-19)*(0.04)/(14));
-    V1 *= 1/div;
+    double V1 = (double)((sample * 3.342) / (pow(2,11)));
+    V1 *= (9.8);
+    // double div = 0.96 + ((V1-19)*(0.04)/(14));
+    // V1 *= 1/div;
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
     ble_write_to_characteristic(exponent_part(V1), decimal_part(V1), voltage_1_char_handles);
+
+    nrf_delay_ms(1000);
 
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
     APP_ERROR_CHECK(err_code);
     
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
-    double V2 = (double)((sample * 3.335) / (pow(2,12)));
-    V2 *= (14/11);
+    double V2 = (double)((sample * 3.341) / (pow(2,12)));
+    // V2 *= (14/11);
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
 
@@ -947,6 +973,7 @@ static void rtc_start(void){
  */
 int main(void)
 {
+    
     log_init();
     NRF_LOG_FLUSH();
     NRF_LOG_INFO("Program Start!!!!");
@@ -968,12 +995,12 @@ int main(void)
     // call the rtc configuration
     rtc_config();
     rtc_start();
-
     
 
     // Sleep in the while loop until an event is generated
     while (true)
     {
+        
         NRF_LOG_FLUSH();
         // __SEV();
         // __WFE();
