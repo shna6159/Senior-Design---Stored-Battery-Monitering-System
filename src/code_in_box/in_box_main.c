@@ -649,8 +649,13 @@ void saadc_sample_write_ble()
     
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V = (double)((sample * 3.002) / (pow(2,12)));
+<<<<<<< Updated upstream
     double V1 = (double)((sample * 3.335) / (pow(2,12)));
     V1 *= (1.118/0.118);
+=======
+    double V1 = (double)((sample * 3.025) / (pow(2,12)));
+    V1 *= ((63300 + 5600)/5600);
+>>>>>>> Stashed changes
     //double div = 0.96 + ((V1-19)*(0.04)/(14));
     //V1 *= 1/div;
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
@@ -661,13 +666,12 @@ void saadc_sample_write_ble()
     
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
-    double V2 = (double)((sample * 3.335) / (pow(2,12)));
-    V2 *= (14/11);
+    double V2 = (double)((sample * 3.025) / (pow(2,12)));
+    V2 *= ((11 + 4.7)/11);
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
 
-    nrf_delay_ms(1000);
-}
+    nrf_delay_ms(1000);}
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
