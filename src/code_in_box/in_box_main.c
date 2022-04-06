@@ -97,7 +97,7 @@
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
-#define RTC_VAL_IN_SEC  (5UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define RTC_VAL_IN_SEC  (20UL)   //keep at 20 sec or higher  /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
 
 #define SAADC_CHANNEL1 0
@@ -570,9 +570,9 @@ void output_pin_init()
      nrf_gpio_cfg_output(output_pin7);
 
     nrf_gpio_pin_set(output_pin); 
-    //  nrf_gpio_pin_set(output_pin1); 
+     nrf_gpio_pin_set(output_pin1); 
      nrf_gpio_pin_set(output_pin2); 
-    //  nrf_gpio_pin_set(output_pin3); 
+     nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
      nrf_gpio_pin_set(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
@@ -661,17 +661,22 @@ void saadc_sample_write_ble()
     ret_code_t err_code;
     nrf_saadc_value_t sample;
 
-    // for(int i = 0; i < 10; i++)
-    // {
-
-    // }
-    err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+    double totalSamples;
+    for(int i = 0; i < 10; i++)
+    {
+        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+        double V1 = (double)((sample * 3.342) / (pow(2,11)));
+        V1 *= (998 + 104.7)/(104.7);
+        totalSamples += V1;
+        nrf_delay_ms(50);
+    }
+    double V1 = totalSamples/10;
+    
     APP_ERROR_CHECK(err_code);
     
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V = (double)((sample * 3.002) / (pow(2,12)));
-    double V1 = (double)((sample * 3.342) / (pow(2,11)));
-    V1 *= (9.8);
+    
     // double div = 0.96 + ((V1-19)*(0.04)/(14));
     // V1 *= 1/div;
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
@@ -685,7 +690,8 @@ void saadc_sample_write_ble()
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
     double V2 = (double)((sample * 3.341) / (pow(2,12)));
-    // V2 *= (14/11);
+    V2 = V2 * 1.3;
+    // V2 = 30;
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
 
@@ -979,8 +985,8 @@ int main(void)
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
-    output_pin_init();
-    saadc_init();
+    output_pin_init(); //potentially move to rtc_handler, add ouput_pin_off
+    saadc_init(); //potentially move to the rtc_handler
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
