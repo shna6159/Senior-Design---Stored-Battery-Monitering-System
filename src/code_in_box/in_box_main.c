@@ -665,7 +665,7 @@ void saadc_sample_write_ble()
     for(int i = 0; i < 10; i++)
     {
         err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
-        double V1 = (double)((sample * 3.342) / (pow(2,11)));
+        double V1 = (double)((sample * 3.334) / (pow(2,11)));
         V1 *= (998 + 104.7)/(104.7);
         totalSamples += V1;
         nrf_delay_ms(50);
@@ -689,7 +689,7 @@ void saadc_sample_write_ble()
     
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
-    double V2 = (double)((sample * 3.341) / (pow(2,12)));
+    double V2 = (double)((sample * 3.334) / (pow(2,12)));
     V2 = V2 * 1.3;
     // V2 = 30;
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));

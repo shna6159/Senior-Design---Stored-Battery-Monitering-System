@@ -7,6 +7,7 @@
     "files.associations": {
         "algorithm": "c",
         "uicr_config.h": "c",
-        "boards.h": "c"
+        "boards.h": "c",
+        "app_button.h": "c"
     }
 }
