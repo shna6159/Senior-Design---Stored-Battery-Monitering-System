@@ -656,8 +656,22 @@ void saadc_init()
     nrf_drv_saadc_calibrate_offset();
 }
 
+static void saadc_disable()
+{
+    ret_code_t err_code;
+
+	err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL1);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL2);
+    APP_ERROR_CHECK(err_code);
+	nrf_drv_saadc_uninit();
+}
+
+
 void saadc_sample_write_ble()
 {
+    saadc_init();
+
     ret_code_t err_code;
     nrf_saadc_value_t sample;
 
@@ -673,12 +687,7 @@ void saadc_sample_write_ble()
     double V1 = totalSamples/10;
     
     APP_ERROR_CHECK(err_code);
-    
-    // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
-    // double V = (double)((sample * 3.002) / (pow(2,12)));
-    
-    // double div = 0.96 + ((V1-19)*(0.04)/(14));
-    // V1 *= 1/div;
+
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
     ble_write_to_characteristic(exponent_part(V1), decimal_part(V1), voltage_1_char_handles);
 
@@ -696,6 +705,8 @@ void saadc_sample_write_ble()
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
 
     nrf_delay_ms(1000);
+
+    saadc_disable();
 }
 
 //------------------------------------------------------------------------------------------
@@ -986,7 +997,6 @@ int main(void)
     NRF_LOG_FLUSH();
     leds_init();
     output_pin_init(); //potentially move to rtc_handler, add ouput_pin_off
-    saadc_init(); //potentially move to the rtc_handler
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();

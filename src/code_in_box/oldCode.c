@@ -43,10 +43,16 @@
 //                                      DEFINES
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
-#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(0, 11)
-#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(0, 11)
-
+#define TEMP_SENSOR_1 NRF_GPIO_PIN_MAP(1, 15)
+#define TEMP_SENSOR_2 NRF_GPIO_PIN_MAP(1, 13)
 #define output_pin NRF_GPIO_PIN_MAP(0, 12)
+#define output_pin1 NRF_GPIO_PIN_MAP(0, 13)
+#define output_pin2 NRF_GPIO_PIN_MAP(0, 15)
+#define output_pin3 NRF_GPIO_PIN_MAP(0, 17)
+#define output_pin4 NRF_GPIO_PIN_MAP(0, 20)
+#define output_pin5 NRF_GPIO_PIN_MAP(0, 22)
+#define output_pin6 NRF_GPIO_PIN_MAP(0, 24)
+#define output_pin7 NRF_GPIO_PIN_MAP(1, 00)
 
 #define TX_POWER_LEVEL 8
 
@@ -862,6 +868,38 @@ static void rtc_start(void){
 //                                      PROCEDURES - MISC
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
+// Init output pins
+void output_pin_init()
+{
+    nrf_gpio_cfg_output(output_pin);
+     nrf_gpio_cfg_output(output_pin1);
+     nrf_gpio_cfg_output(output_pin2);
+     nrf_gpio_cfg_output(output_pin3);
+     nrf_gpio_cfg_output(output_pin4);
+     nrf_gpio_cfg_output(output_pin5);
+    //  nrf_gpio_cfg_output(output_pin6);
+     nrf_gpio_cfg_output(output_pin7);
+
+    nrf_gpio_pin_set(output_pin); 
+     nrf_gpio_pin_set(output_pin1); 
+     nrf_gpio_pin_set(output_pin2); 
+     nrf_gpio_pin_set(output_pin3); 
+     nrf_gpio_pin_set(output_pin4);
+     nrf_gpio_pin_set(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
+     nrf_gpio_pin_set(output_pin7);
+}
+void output_pin_disable()
+{
+    nrf_gpio_pin_clear(output_pin); 
+    nrf_gpio_pin_clear(output_pin1); 
+    nrf_gpio_pin_clear(output_pin2); 
+    nrf_gpio_pin_clear(output_pin3); 
+    nrf_gpio_pin_clear(output_pin4);
+    nrf_gpio_pin_clear(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
+    nrf_gpio_pin_clear(output_pin7);
+}
 /*
 Descripttion : Sets up all the the LEDs used by the program
 */
@@ -894,7 +932,9 @@ int main(void)
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
-
+    output_pin_init();
+    // nrf_delay_ms(10000);
+    // output_pin_disable();
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
