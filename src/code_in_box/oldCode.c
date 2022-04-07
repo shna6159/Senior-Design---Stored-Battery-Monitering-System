@@ -62,7 +62,7 @@
 #define UNEXPECTED_LED BSP_BOARD_LED_3  /**< LED to be toggled when the an error occurs */
 // #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-#define DEVICE_NAME "SBMS_in_box" /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME "_in_box" /**< Name of device. Will be included in the advertising data. */
 #define APP_BLE_OBSERVER_PRIO 3   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG 1    /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -871,34 +871,31 @@ static void rtc_start(void){
 // Init output pins
 void output_pin_init()
 {
-    nrf_gpio_cfg_output(output_pin);
      nrf_gpio_cfg_output(output_pin1);
-     nrf_gpio_cfg_output(output_pin2);
+    //  nrf_gpio_cfg_output(output_pin2);
      nrf_gpio_cfg_output(output_pin3);
      nrf_gpio_cfg_output(output_pin4);
      nrf_gpio_cfg_output(output_pin5);
     //  nrf_gpio_cfg_output(output_pin6);
-     nrf_gpio_cfg_output(output_pin7);
+    //  nrf_gpio_cfg_output(output_pin7);
 
-    nrf_gpio_pin_set(output_pin); 
      nrf_gpio_pin_set(output_pin1); 
-     nrf_gpio_pin_set(output_pin2); 
+    //  nrf_gpio_pin_set(output_pin2); 
      nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
      nrf_gpio_pin_set(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
-     nrf_gpio_pin_set(output_pin7);
+    //  nrf_gpio_pin_set(output_pin7);
 }
 void output_pin_disable()
 {
-    nrf_gpio_pin_clear(output_pin); 
     nrf_gpio_pin_clear(output_pin1); 
-    nrf_gpio_pin_clear(output_pin2); 
+    // nrf_gpio_pin_clear(output_pin2); 
     nrf_gpio_pin_clear(output_pin3); 
     nrf_gpio_pin_clear(output_pin4);
     nrf_gpio_pin_clear(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
-    nrf_gpio_pin_clear(output_pin7);
+    // nrf_gpio_pin_clear(output_pin7);
 }
 /*
 Descripttion : Sets up all the the LEDs used by the program
@@ -932,9 +929,11 @@ int main(void)
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
+
     output_pin_init();
-    // nrf_delay_ms(10000);
-    // output_pin_disable();
+    nrf_delay_ms(10000);
+    output_pin_disable();
+
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();

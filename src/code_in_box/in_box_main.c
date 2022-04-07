@@ -375,8 +375,8 @@ static void ble_advertising_start(void)
     // ble_advertising_init();
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-    bsp_board_led_on(ADVERTISING_LED);
-    bsp_board_led_off(LEDBUTTON_LED);
+    // bsp_board_led_on(ADVERTISING_LED);
+    // bsp_board_led_off(LEDBUTTON_LED);
 
     NRF_LOG_INFO("Advertising Start \n\n");
 }
@@ -409,8 +409,8 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Connected");
 
-        bsp_board_led_on(CONNECTED_LED);
-        bsp_board_led_off(ADVERTISING_LED);
+        // bsp_board_led_on(CONNECTED_LED);
+        // bsp_board_led_off(ADVERTISING_LED);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
         nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -421,7 +421,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Disconnected");
 
-        bsp_board_led_off(CONNECTED_LED);
+        // bsp_board_led_off(CONNECTED_LED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         // err_code = app_button_disable();
         // APP_ERROR_CHECK(err_code);
@@ -560,23 +560,31 @@ static int exponent_part(double num){
 // Init output pins
 void output_pin_init()
 {
-    nrf_gpio_cfg_output(output_pin);
      nrf_gpio_cfg_output(output_pin1);
-     nrf_gpio_cfg_output(output_pin2);
+    //  nrf_gpio_cfg_output(output_pin2);
      nrf_gpio_cfg_output(output_pin3);
      nrf_gpio_cfg_output(output_pin4);
      nrf_gpio_cfg_output(output_pin5);
     //  nrf_gpio_cfg_output(output_pin6);
-     nrf_gpio_cfg_output(output_pin7);
+    //  nrf_gpio_cfg_output(output_pin7);
 
-    nrf_gpio_pin_set(output_pin); 
      nrf_gpio_pin_set(output_pin1); 
-     nrf_gpio_pin_set(output_pin2); 
+    //  nrf_gpio_pin_set(output_pin2); 
      nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
      nrf_gpio_pin_set(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
-     nrf_gpio_pin_set(output_pin7);
+    //  nrf_gpio_pin_set(output_pin7);
+}
+void output_pin_disable()
+{
+    nrf_gpio_pin_clear(output_pin1); 
+    // nrf_gpio_pin_clear(output_pin2); 
+    nrf_gpio_pin_clear(output_pin3); 
+    nrf_gpio_pin_clear(output_pin4);
+    nrf_gpio_pin_clear(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
+    // nrf_gpio_pin_clear(output_pin7);
 }
 
 /*
@@ -924,23 +932,34 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
     if (int_type == NRF_DRV_RTC_INT_TICK)
     {
         // perform some action
-        bsp_board_led_invert(ADVERTISING_LED);
+        // bsp_board_led_invert(ADVERTISING_LED);
     }
     else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
     {
+        output_pin_init();
         NRF_LOG_DEBUG("RTC compare event");
-        bsp_board_led_invert(UNEXPECTED_LED);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
 
         // temp sensor code
 
 
-            timer_init();
-            counter_init();
-            setup_gpiote_event(TEMP_SENSOR_1);
-            setup_timer_and_counter_ppi();
-            temp_sensor_measure();        
-            nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        timer_init();
+        counter_init();
+        setup_gpiote_event(TEMP_SENSOR_1);
+        setup_timer_and_counter_ppi();
+        temp_sensor_measure();        
+        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        output_pin_disable();
     }
     else
     {
@@ -996,7 +1015,6 @@ int main(void)
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
-    output_pin_init(); //potentially move to rtc_handler, add ouput_pin_off
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
