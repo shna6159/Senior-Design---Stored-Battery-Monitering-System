@@ -1,3 +1,5 @@
+
+
 /**
  * Copyright (c) 2016 - 2021, Nordic Semiconductor ASA
  *
@@ -565,6 +567,7 @@ static void uart_init(void)
                        uart_event_handle,
                        APP_IRQ_PRIORITY_LOWEST,
                        err_code);
+    NRF_LOG_INFO("TOMATOS");
 
     APP_ERROR_CHECK(err_code);
 }
@@ -659,6 +662,7 @@ int main(void)
     // Initialize.
     log_init();
     timer_init();
+    NRF_LOG_INFO("WHOREJKLRE:SWJGIFOSD:PNRFEKWL:j");
     uart_init();
     buttons_leds_init();
     db_discovery_init();

@@ -413,7 +413,7 @@ static void ble_stack_init(void)
     APP_ERROR_CHECK(err_code);
 
     // Register handlers for BLE and SoC events.
-    NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
+    NRF_SDH_BLE_OBSobserERVER(m_ble_ver, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
     NRF_SDH_SOC_OBSERVER(m_soc_observer, APP_SOC_OBSERVER_PRIO, soc_evt_handler, NULL);
 }
 
