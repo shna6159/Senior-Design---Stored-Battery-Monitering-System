@@ -19,7 +19,7 @@
 #include "nrf_ble_qwr.h"
 #include "nrf_pwr_mgmt.h"
 #include "nrf_delay.h"
-
+#include "math.h"
 
 #include "nrf_drv_clock.h"
 #include "nrf_drv_rtc.h"
@@ -62,12 +62,12 @@
 #define UNEXPECTED_LED BSP_BOARD_LED_3  /**< LED to be toggled when the an error occurs */
 // #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-#define DEVICE_NAME "_in_box" /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME "SBMS_in_box" /**< Name of device. Will be included in the advertising data. */
 #define APP_BLE_OBSERVER_PRIO 3   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG 1    /**< A tag identifying the SoftDevice BLE configuration. */
 
 #define APP_ADV_INTERVAL 64                                    /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
-#define APP_ADV_DURATION BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
+#define APP_ADV_DURATION 1000 /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
 
 #define MIN_CONN_INTERVAL MSEC_TO_UNITS(100, UNIT_1_25_MS) /**< Minimum acceptable connection interval (0.5 seconds). */
 #define MAX_CONN_INTERVAL MSEC_TO_UNITS(200, UNIT_1_25_MS) /**< Maximum acceptable connection interval (1 second). */
@@ -92,13 +92,16 @@
         0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00 \
     }
 #define UUID_SERVICE 0x1234
-#define UUID_VOLTAGE_CHAR 0x1234
+#define UUID_VOLTAGE_1_CHAR 0x5514
+#define UUID_VOLTAGE_2_CHAR 0x4514
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
-#define RTC_VAL_IN_SEC  (20UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define RTC_VAL_IN_SEC  (20UL)   //keep at 20 sec or higher  /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
 
+#define SAADC_CHANNEL1 0
+#define SAADC_CHANNEL2 1
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
@@ -119,11 +122,11 @@ static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;           /**< Adv
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];            /**< Buffer for storing an encoded advertising set. */
 static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Buffer for storing an encoded scan data. */
 
-ble_gatts_char_handles_t voltage_char_handles;       /** Voltage Sensor Characteristic */
+ble_gatts_char_handles_t voltage_1_char_handles;     /** Voltage Sensor 1 Characteristic */
+ble_gatts_char_handles_t voltage_2_char_handles;     /** Voltage Sensor 2 Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
 
-#define SAADC_CHANNEL 0
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
     {
@@ -234,8 +237,11 @@ static void ble_advertising_init(void)
     add_char_params.read_access = SEC_OPEN;
     add_char_params.cccd_write_access = SEC_OPEN;
 
-    add_char_params.uuid = UUID_VOLTAGE_CHAR;
-    characteristic_add(service_handle, &add_char_params, &voltage_char_handles); // Setup voltage characteristic
+    add_char_params.uuid = UUID_VOLTAGE_1_CHAR;
+    characteristic_add(service_handle, &add_char_params, &voltage_1_char_handles); // Setup voltage characteristic
+
+    add_char_params.uuid = UUID_VOLTAGE_2_CHAR;
+    characteristic_add(service_handle, &add_char_params, &voltage_2_char_handles); // Setup voltage characteristic
 
     add_char_params.uuid = UUID_TEMPERATURE_1_CHAR;
     characteristic_add(service_handle, &add_char_params, &temperature_1_char_handles); // Setup_temperature characteristic
@@ -366,26 +372,30 @@ static void ble_connection_params_init(void)
  */
 static void ble_advertising_start(void)
 {
+    // ble_advertising_init();
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
-    bsp_board_led_off(LEDBUTTON_LED);
+    nrf_delay_ms(1000);
+    bsp_board_led_off(ADVERTISING_LED);
+    // bsp_board_led_off(LEDBUTTON_LED);
 
     NRF_LOG_INFO("Advertising Start \n\n");
 }
 
-static void ble_advertising_stop(void)
-{
-    ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
-    if(err_code == NRF_SUCCESS)
-    {
-        bsp_board_led_off(ADVERTISING_LED);
-        bsp_board_led_on(LEDBUTTON_LED);
-    }
+// static void ble_advertising_stop(void)
+// {
+//     ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
+//     APP_ERROR_CHECK(err_code);
+//     if(err_code == NRF_SUCCESS)
+//     {
+//         bsp_board_led_off(ADVERTISING_LED);
+//         bsp_board_led_on(LEDBUTTON_LED);
+//     }
     
 
-    NRF_LOG_INFO("Advertising Stop \n\n");
-}
+//     NRF_LOG_INFO("Advertising Stop \n\n");
+// }
 
 /**@brief Function for handling BLE events.
  *
@@ -401,8 +411,8 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Connected");
 
-        bsp_board_led_on(CONNECTED_LED);
-        bsp_board_led_off(ADVERTISING_LED);
+        // bsp_board_led_on(CONNECTED_LED);
+        // bsp_board_led_off(ADVERTISING_LED);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
         nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -413,11 +423,11 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Disconnected");
 
-        bsp_board_led_off(CONNECTED_LED);
+        // bsp_board_led_off(CONNECTED_LED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         // err_code = app_button_disable();
         // APP_ERROR_CHECK(err_code);
-        ble_advertising_start();
+        // ble_advertising_start();
         break;
 
         // case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
@@ -513,6 +523,92 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
 
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+//                                      PROCEDURES - MISC
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+// /**
+//  * @brief Function for configuration of REGOUT0 register.
+//  */
+// void vddInit(void)
+// {
+//   if (NRF_UICR->REGOUT0 != UICR_REGOUT0_VOUT_3V3) 
+//   {
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;    //write enable
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+// 	NRF_UICR->REGOUT0 = UICR_REGOUT0_VOUT_3V3;                        //configurate REGOUT0
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+//         NVIC_SystemReset();                                               // Reset device
+//   } 
+// }
+
+static int decimal_part(double num){
+  int intpart = (int)num;
+  double decpart = num - intpart;
+  int decimal = decpart*100;
+  NRF_LOG_DEBUG("decimal part is %d", decimal);
+  return decimal;
+}
+
+static int exponent_part(double num){
+    int intpart = (int)num;
+      NRF_LOG_DEBUG("int part is %d", intpart);
+    return intpart;
+}
+
+
+// Init output pins
+void output_pin_init()
+{
+     nrf_gpio_cfg_output(output_pin1);
+    //  nrf_gpio_cfg_output(output_pin2);
+     nrf_gpio_cfg_output(output_pin3);
+     nrf_gpio_cfg_output(output_pin4);
+     nrf_gpio_cfg_output(output_pin5);
+    //  nrf_gpio_cfg_output(output_pin6);
+    //  nrf_gpio_cfg_output(output_pin7);
+
+     nrf_gpio_pin_set(output_pin1); 
+    //  nrf_gpio_pin_set(output_pin2); 
+     nrf_gpio_pin_set(output_pin3); 
+     nrf_gpio_pin_set(output_pin4);
+     nrf_gpio_pin_set(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
+    //  nrf_gpio_pin_set(output_pin7);
+}
+void output_pin_disable()
+{
+    nrf_gpio_pin_clear(output_pin1); 
+    // nrf_gpio_pin_clear(output_pin2); 
+    nrf_gpio_pin_clear(output_pin3); 
+    nrf_gpio_pin_clear(output_pin4);
+    nrf_gpio_pin_clear(output_pin5);
+    //  nrf_gpio_pin_set(output_pin6);
+    // nrf_gpio_pin_clear(output_pin7);
+}
+
+/*
+Descripttion : Sets up all the the LEDs used by the program
+*/
+static void leds_init(void)
+{
+    NRF_LOG_DEBUG("LED init");
+
+    bsp_board_init(BSP_INIT_LEDS);
+}
+
+static void log_init(void)
+{
+    ret_code_t err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
@@ -522,45 +618,105 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
 }
+
 /**
  * @brief Function for confguring SAADC channel 0 for sampling AIN0 (P0.02).
  */
-void saadc_init(void)
+void saadc_init()
 {
+
     ret_code_t err_code;
-    nrf_saadc_channel_config_t channel_config;
-    //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
-    channel_config.pin_p      = NRF_SAADC_INPUT_AIN1;
-    channel_config.pin_n      = NRF_SAADC_INPUT_AIN5;
-    channel_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
-    channel_config.acq_time   = NRF_SAADC_ACQTIME_40US;
-    channel_config.reference  = NRF_SAADC_REFERENCE_VDD4;
-    // channel_config.gain       = NRF_SAADC_GAIN1_6;
-    channel_config.gain       = NRF_SAADC_GAIN1_2;
-    channel_config.resistor_p = NRF_SAADC_RESISTOR_PULLDOWN;
-    channel_config.resistor_n = NRF_SAADC_RESISTOR_PULLUP;
-    channel_config.burst      = NRF_SAADC_BURST_ENABLED;
-
-    // channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
-    // channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
-
+	
     nrf_drv_saadc_config_t saadc_config;
     saadc_config.interrupt_priority = APP_IRQ_PRIORITY_HIGHEST;
     saadc_config.low_power_mode = false;
     saadc_config.oversample = NRF_SAADC_OVERSAMPLE_DISABLED;
     saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
-    // saadc_config.scaling    = NRF_ADC_CONFIG_SCALING_INPUT_ONE_THIRD;
-    // saadc_config.reference  = NRF_ADC_CONFIG_REF_VBG;
+	
+    nrf_saadc_channel_config_t channel_1_config;
+    //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
+    channel_1_config.pin_p      = NRF_SAADC_INPUT_AIN5; // NRF_GPIO_PIN_MAP(0, 29)
+    channel_1_config.pin_n      = NRF_SAADC_INPUT_AIN0;
+    channel_1_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
+    channel_1_config.acq_time   = NRF_SAADC_ACQTIME_40US;
+    channel_1_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    // channel_1_config.gain       = NRF_SAADC_GAIN1_6;
+    channel_1_config.gain       = NRF_SAADC_GAIN1_4;
+    channel_1_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
+    channel_1_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
+    channel_1_config.burst      = NRF_SAADC_BURST_ENABLED;
 
+    nrf_saadc_channel_config_t channel_2_config =
+        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN7);
+    channel_2_config.acq_time   = NRF_SAADC_ACQTIME_40US;
+    channel_2_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    channel_2_config.gain       = NRF_SAADC_GAIN1_4;
+    channel_2_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
+    channel_2_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
+    channel_2_config.burst      = NRF_SAADC_BURST_ENABLED;
 
     err_code = nrf_drv_saadc_init(&saadc_config, saadc_callback);
-
-    // err_code = nrf_drv_saadc_init(NULL, saadc_callback);
     APP_ERROR_CHECK(err_code);
     
-    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL, &channel_config);
+    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL1, &channel_1_config);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_channel_init(SAADC_CHANNEL2, &channel_2_config);
     APP_ERROR_CHECK(err_code);
     nrf_drv_saadc_calibrate_offset();
+}
+
+static void saadc_disable()
+{
+    ret_code_t err_code;
+
+	err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL1);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL2);
+    APP_ERROR_CHECK(err_code);
+	nrf_drv_saadc_uninit();
+}
+
+
+void saadc_sample_write_ble()
+{
+    saadc_init();
+
+    ret_code_t err_code;
+    nrf_saadc_value_t sample;
+
+    double totalSamples;
+    for(int i = 0; i < 10; i++)
+    {
+        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+        double V1 = (double)((sample * 3.334) / (pow(2,11)));
+        V1 *= (998 + 104.7)/(104.7);
+        totalSamples += V1;
+        nrf_delay_ms(50);
+    }
+    double V1 = totalSamples/10;
+    
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
+    ble_write_to_characteristic(exponent_part(V1), decimal_part(V1), voltage_1_char_handles);
+
+    nrf_delay_ms(1000);
+
+    err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
+    APP_ERROR_CHECK(err_code);
+    
+    // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
+    // double V2 = (double)((sample * 3.002) / (pow(2,12)));
+    double V2 = (double)((sample * 3.334) / (pow(2,12)));
+    V2 = V2 * 1.3;
+    // V2 = 30;
+    NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
+    ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
+
+    nrf_delay_ms(1000);
+
+    saadc_disable();
 }
 
 //------------------------------------------------------------------------------------------
@@ -622,9 +778,6 @@ static void setup_gpiote_event(uint32_t pin)
 
 static void setup_timer_and_counter_ppi()
 {
-// ret_code_t err_code = nrf_drv_ppi_init();
-// APP_ERROR_CHECK(err_code);
-
     NRF_PPI->CHEN |= 1 << 0;
     *(&(NRF_PPI->CH0_EEP)) = (uint32_t)&NRF_TIMER3->EVENTS_COMPARE[0];
     *(&(NRF_PPI->CH0_TEP)) = (uint32_t)&NRF_TIMER2->TASKS_CAPTURE[0];
@@ -657,19 +810,6 @@ static void setup_timer_and_counter_ppi()
 
 }
 
-static int decimal_part(double num){
-  int intpart = (int)num;
-  double decpart = num - intpart;
-  int decimal = decpart*100;
-  NRF_LOG_DEBUG("decimal part is %d", decimal);
-  return decimal;
-}
-
-static int exponent_part(double num){
-    int intpart = (int)num;
-      NRF_LOG_DEBUG("int part is %d", intpart);
-    return intpart;
-}
 
 void TIMER3_IRQHandler(void)
 {
@@ -731,10 +871,15 @@ void TIMER3_IRQHandler(void)
                 else{
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     temp_sensor = false;
+                    saadc_sample_write_ble();
                     
                     NRF_TIMER2->CC[0] = 0;
                     NRF_TIMER3->CC[2] = 0;
                     NRF_TIMER3->CC[3] = 0;
+            // ble_advertising_start();
+            // nrf_delay_ms(7000);
+            // ble_advertising_stop();
+
                 }
 
                 // nrf_delay_ms(10000);
@@ -789,35 +934,76 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
     if (int_type == NRF_DRV_RTC_INT_TICK)
     {
         // perform some action
-        bsp_board_led_invert(ADVERTISING_LED);
+        // bsp_board_led_invert(ADVERTISING_LED);
     }
     else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
     {
+        // ble_advertising_start();
+        output_pin_init();
         NRF_LOG_DEBUG("RTC compare event");
         bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
 
         // temp sensor code
 
 
-        if(is_advertising == false){
-            timer_init();
-            counter_init();
-            setup_gpiote_event(TEMP_SENSOR_1);
-            setup_timer_and_counter_ppi();
-            temp_sensor_measure();
-
-            ble_advertising_start();
-            is_advertising = true;
-        }
-        else{
-            ble_advertising_stop();
-            is_advertising = false;
-        }
-        
+        timer_init();
+        counter_init();
+        setup_gpiote_event(TEMP_SENSOR_1);
+        setup_timer_and_counter_ppi();
+        temp_sensor_measure();        
+        // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
         
 
-        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+
+
+        // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
+        unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
+        // Handle different cases. Mapping is as follows:
+        // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
+        switch (RTC_CONFIG_CHARVAL)
+        {
+        case RTC_VAL_IN_SEC: // Default
+
+            nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+            break;
+
+        case 0:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
+            break;
+
+        case 1:
+
+            nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
+            break;
+
+        case 2:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
+            break;
+
+        case 3:
+
+            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+            break;
+
+        case 4:
+
+            nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+            break;
+
+        }
+        output_pin_disable();
     }
     else
     {
@@ -862,103 +1048,36 @@ static void rtc_start(void){
 //------------------------------------------------------------------------------------------
 
 
-
-//------------------------------------------------------------------------------------------
-//------------------------------------------------------------------------------------------
-//                                      PROCEDURES - MISC
-//------------------------------------------------------------------------------------------
-//------------------------------------------------------------------------------------------
-// Init output pins
-void output_pin_init()
-{
-     nrf_gpio_cfg_output(output_pin1);
-    //  nrf_gpio_cfg_output(output_pin2);
-     nrf_gpio_cfg_output(output_pin3);
-     nrf_gpio_cfg_output(output_pin4);
-     nrf_gpio_cfg_output(output_pin5);
-    //  nrf_gpio_cfg_output(output_pin6);
-    //  nrf_gpio_cfg_output(output_pin7);
-
-     nrf_gpio_pin_set(output_pin1); 
-    //  nrf_gpio_pin_set(output_pin2); 
-     nrf_gpio_pin_set(output_pin3); 
-     nrf_gpio_pin_set(output_pin4);
-     nrf_gpio_pin_set(output_pin5);
-    //  nrf_gpio_pin_set(output_pin6);
-    //  nrf_gpio_pin_set(output_pin7);
-}
-void output_pin_disable()
-{
-    nrf_gpio_pin_clear(output_pin1); 
-    // nrf_gpio_pin_clear(output_pin2); 
-    nrf_gpio_pin_clear(output_pin3); 
-    nrf_gpio_pin_clear(output_pin4);
-    nrf_gpio_pin_clear(output_pin5);
-    //  nrf_gpio_pin_set(output_pin6);
-    // nrf_gpio_pin_clear(output_pin7);
-}
-/*
-Descripttion : Sets up all the the LEDs used by the program
-*/
-static void leds_init(void)
-{
-    NRF_LOG_DEBUG("LED init");
-
-    bsp_board_init(BSP_INIT_LEDS);
-}
-
-static void log_init(void)
-{
-    ret_code_t err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-}
-
-//------------------------------------------------------------------------------------------
-//------------------------------------------------------------------------------------------
-
-
 /**
  * @brief Function for application main entry.
  */
 int main(void)
 {
+    
     log_init();
     NRF_LOG_FLUSH();
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
-
-    output_pin_init();
-    nrf_delay_ms(10000);
-    output_pin_disable();
-
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
     ble_services_init();
     ble_advertising_init();
     ble_connection_params_init();
-
-
-        // timer_init();
-        // counter_init();
-        // setup_gpiote_event(TEMP_SENSOR_1);
-        // setup_timer_and_counter_ppi();
-        // temp_sensor_measure();
+    ble_advertising_start();
     // // call the clock configuration
     // lfclk_config();
 
     // call the rtc configuration
     rtc_config();
     rtc_start();
-
-
+    
 
     // Sleep in the while loop until an event is generated
     while (true)
     {
+        
         NRF_LOG_FLUSH();
         // __SEV();
         // __WFE();
