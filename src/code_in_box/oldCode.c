@@ -96,6 +96,7 @@
 #define UUID_VOLTAGE_2_CHAR 0x4514
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
+#define UUID_RTC_CONFIG_CHAR 0x9123
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
 #define RTC_VAL_IN_SEC  (20UL)   //keep at 20 sec or higher  /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
@@ -126,6 +127,7 @@ ble_gatts_char_handles_t voltage_1_char_handles;     /** Voltage Sensor 1 Charac
 ble_gatts_char_handles_t voltage_2_char_handles;     /** Voltage Sensor 2 Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
+ble_gatts_char_handles_t rtc_config_char_handles;    /** RTC Configuration Characteristic */
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -248,6 +250,9 @@ static void ble_advertising_init(void)
 
     add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
     characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles); // Setup_temperature characteristic
+
+     add_char_params.uuid = UUID_RTC_CONFIG_CHAR;
+    characteristic_add(service_handle, &add_char_params, &rtc_config_char_handles); // setup_rtc_config characteristic
 
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
 
@@ -961,48 +966,48 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         setup_gpiote_event(TEMP_SENSOR_1);
         setup_timer_and_counter_ppi();
         temp_sensor_measure();        
-        // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
         
 
 
 
-        // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
-        unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
-        // Handle different cases. Mapping is as follows:
-        // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
-        switch (RTC_CONFIG_CHARVAL)
-        {
-        case RTC_VAL_IN_SEC: // Default
+        // // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
+        // unsigned long RTC_CONFIG_CHARVAL = 2;
+        // // Handle different cases. Mapping is as follows:
+        // // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
+        // switch (RTC_CONFIG_CHARVAL)
+        // {
+        // case RTC_VAL_IN_SEC: // Default
 
-            nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        //     break;
 
-        case 0:
+        // case 0:
 
-            nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
+        //     break;
 
-        case 1:
+        // case 1:
 
-            nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
+        //     break;
 
-        case 2:
+        // case 2:
 
-            nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
+        //     break;
 
-        case 3:
+        // case 3:
 
-            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+        //     break;
 
-        case 4:
+        // case 4:
 
-            nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
-            break;
+        //     nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+        //     break;
 
-        }
+        // }
         output_pin_disable();
     }
     else
@@ -1065,7 +1070,7 @@ int main(void)
     ble_services_init();
     ble_advertising_init();
     ble_connection_params_init();
-    ble_advertising_start();
+    
     // // call the clock configuration
     // lfclk_config();
 
@@ -1073,6 +1078,7 @@ int main(void)
     rtc_config();
     rtc_start();
     
+    ble_advertising_start();
 
     // Sleep in the while loop until an event is generated
     while (true)
