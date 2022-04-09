@@ -574,7 +574,10 @@ void output_pin_init()
      nrf_gpio_cfg_output(output_pin5);
     //  nrf_gpio_cfg_output(output_pin6);
     //  nrf_gpio_cfg_output(output_pin7);
+}
 
+void output_pin_enable()
+{
      nrf_gpio_pin_set(output_pin1); 
     //  nrf_gpio_pin_set(output_pin2); 
      nrf_gpio_pin_set(output_pin3); 
@@ -583,13 +586,14 @@ void output_pin_init()
     //  nrf_gpio_pin_set(output_pin6);
     //  nrf_gpio_pin_set(output_pin7);
 }
+
 void output_pin_disable()
 {
-    nrf_gpio_pin_clear(output_pin1); 
+    // nrf_gpio_pin_clear(output_pin1); 
     // nrf_gpio_pin_clear(output_pin2); 
     nrf_gpio_pin_clear(output_pin3); 
     nrf_gpio_pin_clear(output_pin4);
-    nrf_gpio_pin_clear(output_pin5);
+    // nrf_gpio_pin_clear(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
     // nrf_gpio_pin_clear(output_pin7);
 }
@@ -700,6 +704,7 @@ void saadc_sample_write_ble()
         nrf_delay_ms(50);
     }
     double V1 = totalSamples/10;
+
     
     APP_ERROR_CHECK(err_code);
 
@@ -943,8 +948,8 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
     }
     else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
     {
+        output_pin_enable();
         ble_advertising_start();
-        output_pin_init();
         NRF_LOG_DEBUG("RTC compare event");
         bsp_board_led_invert(UNEXPECTED_LED);
         nrf_delay_ms(1000);
@@ -967,12 +972,14 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         setup_timer_and_counter_ppi();
         temp_sensor_measure();        
         // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        // nrf_delay_ms(5000);
+        output_pin_disable();
         
 
 
 
         // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
-        unsigned long RTC_CONFIG_CHARVAL = 2;
+        unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
         // Handle different cases. Mapping is as follows:
         // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
         switch (RTC_CONFIG_CHARVAL)
@@ -1008,7 +1015,6 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
             break;
 
         }
-        output_pin_disable();
     }
     else
     {
@@ -1034,7 +1040,6 @@ static void rtc_config(void)
     err_code = nrf_drv_rtc_init(&rtc, &rtc_config, rtc_handler);
     APP_ERROR_CHECK(err_code); // check for errors
 
-    // Generate a tick event on each tick
     // nrf_drv_rtc_tick_enable(&rtc, true);
 
     err_code = nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
@@ -1064,6 +1069,7 @@ int main(void)
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
+    output_pin_init();
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();

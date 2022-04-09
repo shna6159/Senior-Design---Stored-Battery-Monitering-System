@@ -943,7 +943,7 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
     }
     else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
     {
-        // ble_advertising_start();
+        ble_advertising_start();
         output_pin_init();
         NRF_LOG_DEBUG("RTC compare event");
         bsp_board_led_invert(UNEXPECTED_LED);
@@ -966,48 +966,48 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         setup_gpiote_event(TEMP_SENSOR_1);
         setup_timer_and_counter_ppi();
         temp_sensor_measure();        
-        nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
         
 
 
 
-        // // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
-        // unsigned long RTC_CONFIG_CHARVAL = 2;
-        // // Handle different cases. Mapping is as follows:
-        // // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
-        // switch (RTC_CONFIG_CHARVAL)
-        // {
-        // case RTC_VAL_IN_SEC: // Default
+        // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
+        unsigned long RTC_CONFIG_CHARVAL = 2;
+        // Handle different cases. Mapping is as follows:
+        // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
+        switch (RTC_CONFIG_CHARVAL)
+        {
+        case RTC_VAL_IN_SEC: // Default
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+            break;
 
-        // case 0:
+        case 0:
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
+            break;
 
-        // case 1:
+        case 1:
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
+            break;
 
-        // case 2:
+        case 2:
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
+            break;
 
-        // case 3:
+        case 3:
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+            break;
 
-        // case 4:
+        case 4:
 
-        //     nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
-        //     break;
+            nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+            break;
 
-        // }
+        }
         output_pin_disable();
     }
     else
