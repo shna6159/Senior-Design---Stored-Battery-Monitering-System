@@ -219,7 +219,7 @@ static void ble_advertising_init(void)
     ble_uuid_t ble_uuid;
     ble_add_char_params_t add_char_params;
     ble_uuid128_t base_uuid = {UUID_BASE};
-    uint8_t uuid_type;
+    uint8_t uuid_type = BLE_UUID_TYPE_BLE;
     sd_ble_uuid_vs_add(&base_uuid, &uuid_type);
     ble_uuid.type = uuid_type;
     ble_uuid.uuid = UUID_SERVICE;
@@ -382,22 +382,6 @@ static void ble_advertising_start(void)
     NRF_LOG_INFO("Advertising Start \n\n");
 }
 
-<<<<<<< HEAD
-// static void ble_advertising_stop(void)
-// {
-//     ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
-//     APP_ERROR_CHECK(err_code);
-//     if(err_code == NRF_SUCCESS)
-//     {
-//         bsp_board_led_off(ADVERTISING_LED);
-//         bsp_board_led_on(LEDBUTTON_LED);
-//     }
-    
-
-//     NRF_LOG_INFO("Advertising Stop \n\n");
-// }
-=======
->>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
 
 /**@brief Function for handling BLE events.
  *
@@ -649,13 +633,8 @@ void saadc_sample_write_ble()
     
     // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V = (double)((sample * 3.002) / (pow(2,12)));
-<<<<<<< Updated upstream
-    double V1 = (double)((sample * 3.335) / (pow(2,12)));
-    V1 *= (1.118/0.118);
-=======
     double V1 = (double)((sample * 3.025) / (pow(2,12)));
     V1 *= ((63300 + 5600)/5600);
->>>>>>> Stashed changes
     //double div = 0.96 + ((V1-19)*(0.04)/(14));
     //V1 *= 1/div;
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
@@ -803,11 +782,7 @@ void TIMER3_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-<<<<<<< HEAD
-                temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
-=======
                 temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
->>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
                 valid_temp_counter = 0;
 
                 expo = exponent_part(temperature);
@@ -982,10 +957,6 @@ int main(void)
 
     
 
-<<<<<<< HEAD
-    // Sleep in the while loop until an event is generated
-    while (true)
-=======
     NRF_TIMER1->TASKS_START = 1;
     NRF_TIMER2->TASKS_START = 1;
 
@@ -999,7 +970,6 @@ int main(void)
 
 
     for(;;)
->>>>>>> e7c63166b039113be48cfd7bd60c5918f8b9221b
     {
         NRF_LOG_FLUSH();
         // __SEV();

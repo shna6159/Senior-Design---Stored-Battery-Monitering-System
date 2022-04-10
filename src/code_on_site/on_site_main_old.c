@@ -1,5 +1,7 @@
+
+
 /**
- * Copyright (c) 2014 - 2021, Nordic Semiconductor ASA
+ * Copyright (c) 2016 - 2021, Nordic Semiconductor ASA
  *
  * All rights reserved.
  *
@@ -37,291 +39,71 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-/**
- * @brief BLE Heart Rate Collector application main file.
- *
- * This file contains the source code for a sample heart rate collector.
- */
-
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "nordic_common.h"
-#include "nrf.h"
-#include "nrf_drv_usbd.h"
-#include "nrf_drv_clock.h"
-#include "nrf_gpio.h"
-#include "nrf_delay.h"
-#include "nrf_drv_power.h"
-#include "app_usbd_core.h"
-#include "app_usbd.h"
-#include "app_usbd_string_desc.h"
-#include <app_usbd_cdc_acm.h>
-#include "app_usbd_serial_num.h"
-#include "nrf_delay.h"
-#include "boards.h"
-#include "bsp.h"
-#include "bsp_cli.h"
-#include "nrf_cli.h"
-#include "nrf_cli_uart.h"
-#include "nrf_usbd.h"
-#include "nrf_sdm.h"
-#include "ble.h"
-#include "ble_hci.h"
+#include "app_error.h"
+#include "app_uart.h"
 #include "ble_db_discovery.h"
-#include "ble_srv_common.h"
+#include "app_timer.h"
+#include "app_util.h"
+#include "bsp_btn_ble.h"
+#include "ble.h"
+#include "ble_gap.h"
+#include "ble_hci.h"
 #include "nrf_sdh.h"
 #include "nrf_sdh_ble.h"
 #include "nrf_sdh_soc.h"
-#include "nrf_pwr_mgmt.h"
-#include "app_util.h"
-#include "app_error.h"
-#include "peer_manager.h"
-#include "peer_manager_handler.h"
-#include "ble_hrs_c.h"
-#include "ble_bas_c.h"
-#include "app_util.h"
-#include "app_timer.h"
-#include "bsp_btn_ble.h"
-#include "fds.h"
-#include "nrf_fstorage.h"
-#include "ble_conn_state.h"
+#include "ble_nus_c.h"
 #include "nrf_ble_gatt.h"
-#include "nrf_ble_lesc.h"
+#include "nrf_pwr_mgmt.h"
+#include "nrf_ble_scan.h"
+
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
-#include "nrf_ble_scan.h"
 
 
-#define APP_BLE_CONN_CFG_TAG        1                                   /**< A tag identifying the SoftDevice BLE configuration. */
+#define APP_BLE_CONN_CFG_TAG    1                                       /**< Tag that refers to the BLE stack configuration set with @ref sd_ble_cfg_set. The default tag is @ref BLE_CONN_CFG_TAG_DEFAULT. */
+#define APP_BLE_OBSERVER_PRIO   3                                       /**< BLE observer priority of the application. There is no need to modify this value. */
 
-#define APP_BLE_OBSERVER_PRIO       3                                   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
-#define APP_SOC_OBSERVER_PRIO       1                                   /**< Applications' SoC observer priority. You shouldn't need to modify this value. */
+#define UART_TX_BUF_SIZE        256                                     /**< UART TX buffer size. */
+#define UART_RX_BUF_SIZE        256                                     /**< UART RX buffer size. */
 
-#define LESC_DEBUG_MODE             0                                   /**< Set to 1 to use LESC debug keys, allows you to use a sniffer to inspect traffic. */
+#define NUS_SERVICE_UUID_TYPE   BLE_UUID_TYPE_VENDOR_BEGIN              /**< UUID type for the Nordic UART Service (vendor specific). */
 
-#define SEC_PARAM_BOND              1                                   /**< Perform bonding. */
-#define SEC_PARAM_MITM              0                                   /**< Man In The Middle protection not required. */
-#define SEC_PARAM_LESC              1                                   /**< LE Secure Connections enabled. */
-#define SEC_PARAM_KEYPRESS          0                                   /**< Keypress notifications not enabled. */
-#define SEC_PARAM_IO_CAPABILITIES   BLE_GAP_IO_CAPS_NONE                /**< No I/O capabilities. */
-#define SEC_PARAM_OOB               0                                   /**< Out Of Band data not available. */
-#define SEC_PARAM_MIN_KEY_SIZE      7                                   /**< Minimum encryption key size in octets. */
-#define SEC_PARAM_MAX_KEY_SIZE      16                                  /**< Maximum encryption key size in octets. */
-
-#define SCAN_DURATION_WITELIST      3000                                /**< Duration of the scanning in units of 10 milliseconds. */
-
-#define TARGET_UUID              0x1234         /**< Target device uuid that application is looking for. */
-
-/**@brief Macro to unpack 16bit unsigned UUID from octet stream. */
-#define UUID16_EXTRACT(DST, SRC) \
-    do                           \
-    {                            \
-        (*(DST))   = (SRC)[1];   \
-        (*(DST)) <<= 8;          \
-        (*(DST))  |= (SRC)[0];   \
-    } while (0)
+#define ECHOBACK_BLE_UART_DATA  1                                       /**< Echo the UART data that is received over the Nordic UART Service (NUS) back to the sender. */
 
 
-NRF_BLE_GQ_DEF(m_ble_gatt_queue,                                    /**< BLE GATT Queue instance. */
+BLE_NUS_C_DEF(m_ble_nus_c);                                             /**< BLE Nordic UART Service (NUS) client instance. */
+NRF_BLE_GATT_DEF(m_gatt);                                               /**< GATT module instance. */
+BLE_DB_DISCOVERY_DEF(m_db_disc);                                        /**< Database discovery module instance. */
+NRF_BLE_SCAN_DEF(m_scan);                                               /**< Scanning Module instance. */
+NRF_BLE_GQ_DEF(m_ble_gatt_queue,                                        /**< BLE GATT Queue instance. */
                NRF_SDH_BLE_CENTRAL_LINK_COUNT,
                NRF_BLE_GQ_QUEUE_SIZE);
-BLE_HRS_C_DEF(m_hrs_c);                                             /**< Structure used to identify the heart rate client module. */
-BLE_BAS_C_DEF(m_bas_c);                                             /**< Structure used to identify the Battery Service client module. */
-NRF_BLE_GATT_DEF(m_gatt);                                           /**< GATT module instance. */
-BLE_DB_DISCOVERY_DEF(m_db_disc);                                    /**< DB discovery module instance. */
-NRF_BLE_SCAN_DEF(m_scan);                                           /**< Scanning module instance. */
 
-static uint16_t m_conn_handle;                                      /**< Current connection handle. */
-static bool     m_whitelist_disabled;                               /**< True if whitelist has been temporarily disabled. */
-static bool     m_memory_access_in_progress;                        /**< Flag to keep track of ongoing operations on persistent memory. */
+static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - OPCODE_LENGTH - HANDLE_LENGTH; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
-/**< Scan parameters requested for scanning and connection. */
-static ble_gap_scan_params_t const m_scan_param =
+/**@brief NUS UUID. */
+static ble_uuid_t const m_nus_uuid =
 {
-    .active        = 0x01,
-#if (NRF_SD_BLE_API_VERSION > 7)
-    .interval_us   = NRF_BLE_SCAN_SCAN_INTERVAL * UNIT_0_625_MS,
-    .window_us     = NRF_BLE_SCAN_SCAN_WINDOW * UNIT_0_625_MS,
-#else
-    .interval      = NRF_BLE_SCAN_SCAN_INTERVAL,
-    .window        = NRF_BLE_SCAN_SCAN_WINDOW,
-#endif // (NRF_SD_BLE_API_VERSION > 7)
-    .filter_policy = BLE_GAP_SCAN_FP_WHITELIST,
-    .timeout       = SCAN_DURATION_WITELIST,
-    .scan_phys     = BLE_GAP_PHY_1MBPS,
-};
-
-//#define LED_USB_RESUME      (BSP_BOARD_LED_0)
-#define LED_CDC_ACM_OPEN    (BSP_BOARD_LED_0)
-#define LED_CDC_ACM_RX      (BSP_BOARD_LED_1)
-//#define LED_CDC_ACM_TX      (BSP_BOARD_LED_1)
-
-#ifndef USBD_POWER_DETECTION
-#define USBD_POWER_DETECTION true
-#endif
-
-static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
-                                    app_usbd_cdc_acm_user_event_t event);
-
-#define CDC_ACM_COMM_INTERFACE  0
-#define CDC_ACM_COMM_EPIN       NRF_DRV_USBD_EPIN2
-
-#define CDC_ACM_DATA_INTERFACE  1
-#define CDC_ACM_DATA_EPIN       NRF_DRV_USBD_EPIN1
-#define CDC_ACM_DATA_EPOUT      NRF_DRV_USBD_EPOUT1
-
-APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
-                            cdc_acm_user_ev_handler,
-                            CDC_ACM_COMM_INTERFACE,
-                            CDC_ACM_DATA_INTERFACE,
-                            CDC_ACM_COMM_EPIN,
-                            CDC_ACM_DATA_EPIN,
-                            CDC_ACM_DATA_EPOUT,
-                            APP_USBD_CDC_COMM_PROTOCOL_AT_V250
-);
-
-#define READ_SIZE 1
-
-static char m_rx_buffer[READ_SIZE];
-static char m_tx_buffer[NRF_DRV_USBD_EPSIZE];
-static bool m_send_flag = 1;
-int interval;
-
-static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
-                                    app_usbd_cdc_acm_user_event_t event)
-{
-    switch (event)
-    {
-        case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
-        {
-            //Setup first transfer
-            ret_code_t ret = app_usbd_cdc_acm_read(&m_app_cdc_acm,
-                                                   m_rx_buffer,
-                                                   READ_SIZE);
-            UNUSED_VARIABLE(ret);
-            break;
-        }
-        case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
-            //bsp_board_led_off(LED_CDC_ACM_OPEN);
-            break;
-        case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-            //bsp_board_led_invert(LED_CDC_ACM_TX);
-            break;
-        case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
-        {
-            // LED ensures that RX is completed
-            bsp_board_led_invert(LED_CDC_ACM_OPEN);
-
-            // Using the amounts of bytes stored in buffer to determine interval
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 1)
-            {
-                interval = 1800; //30 mins in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 2)
-            {
-                interval = 3600; //1 hr in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 3)
-            {
-                interval = 7200; //2 hr in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 4)
-            {
-                interval = 21600; //6 hr in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 5)
-            {
-                interval = 43200; //12 hr in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 6)
-            {
-                interval = 86400; //1 day in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 7)
-            {
-                interval = 604800; //1 week in sec
-            }
-            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 8)
-            {
-                interval = 2416200; //4 week in sec
-            }
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-static void usbd_user_ev_handler(app_usbd_event_type_t event)
-{
-    switch (event)
-    {
-        case APP_USBD_EVT_DRV_SUSPEND:
-            //bsp_board_led_off(LED_USB_RESUME);
-            break;
-        case APP_USBD_EVT_DRV_RESUME:
-            //bsp_board_led_on(LED_USB_RESUME);
-            break;
-        case APP_USBD_EVT_STARTED:
-            break;
-        case APP_USBD_EVT_STOPPED:
-            app_usbd_disable();
-            bsp_board_leds_off();
-            break;
-        case APP_USBD_EVT_POWER_DETECTED:
-            //NRF_LOG_INFO("USB power detected");
-
-            if (!nrf_drv_usbd_is_enabled())
-            {
-                app_usbd_enable();
-            }
-            break;
-        case APP_USBD_EVT_POWER_REMOVED:
-            //NRF_LOG_INFO("USB power removed");
-            app_usbd_stop();
-            break;
-        case APP_USBD_EVT_POWER_READY:
-            //NRF_LOG_INFO("USB ready");
-            app_usbd_start();
-            break;
-        default:
-            break;
-    }
-}
-
-/**@brief Names which the central applications will scan for, and which will be advertised by the peripherals.
- *  if these are set to empty strings, the UUIDs defined below will be used
- */
-static char const m_target_periph_name[] = "SBMS_in_box";      /**< If you want to connect to a peripheral using a given advertising name, type its name here. */
-static bool is_connect_per_addr = true;            /**< If you want to connect to a peripheral with a given address, set this to true and put the correct address in the variable below. */
-
-static ble_gap_addr_t const m_target_periph_addr =
-{
-    /* Possible values for addr_type:
-       BLE_GAP_ADDR_TYPE_PUBLIC,
-       BLE_GAP_ADDR_TYPE_RANDOM_STATIC,
-       BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE,
-       BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE. */
-    .addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC,
-    .addr      = {0x8D, 0xFE, 0x23, 0x86, 0x77, 0xD9}
+    .uuid = BLE_UUID_NUS_SERVICE,
+    .type = NUS_SERVICE_UUID_TYPE
 };
 
 
-static void scan_start(void);
-
-
-/**@brief Function for asserts in the SoftDevice.
+/**@brief Function for handling asserts in the SoftDevice.
  *
- * @details This function will be called in case of an assert in the SoftDevice.
+ * @details This function is called in case of an assert in the SoftDevice.
  *
- * @warning This handler is an example only and does not fit a final product. You need to analyze
- *          how your product is supposed to react in case of Assert.
+ * @warning This handler is only an example and is not meant for the final product. You need to analyze
+ *          how your product is supposed to react in case of assert.
  * @warning On assert from the SoftDevice, the system can only recover on reset.
  *
- * @param[in] line_num     Line number of the failing ASSERT call.
- * @param[in] p_file_name  File name of the failing ASSERT call.
+ * @param[in] line_num     Line number of the failing assert call.
+ * @param[in] p_file_name  File name of the failing assert call.
  */
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
@@ -329,46 +111,199 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 }
 
 
-/**@brief Function for handling the Heart Rate Service Client and Battery Service Client errors.
+/**@brief Function for handling the Nordic UART Service Client errors.
  *
  * @param[in]   nrf_error   Error code containing information about what went wrong.
  */
-static void service_error_handler(uint32_t nrf_error)
+static void nus_error_handler(uint32_t nrf_error)
 {
     APP_ERROR_HANDLER(nrf_error);
 }
 
 
+/**@brief Function to start scanning. */
+static void scan_start(void)
+{
+    ret_code_t ret;
+
+    ret = nrf_ble_scan_start(&m_scan);
+    APP_ERROR_CHECK(ret);
+
+    ret = bsp_indication_set(BSP_INDICATE_SCANNING);
+    APP_ERROR_CHECK(ret);
+}
+
+
+/**@brief Function for handling Scanning Module events.
+ */
+static void scan_evt_handler(scan_evt_t const * p_scan_evt)
+{
+    ret_code_t err_code;
+
+    switch(p_scan_evt->scan_evt_id)
+    {
+         case NRF_BLE_SCAN_EVT_CONNECTING_ERROR:
+         {
+              err_code = p_scan_evt->params.connecting_err.err_code;
+              APP_ERROR_CHECK(err_code);
+         } break;
+
+         case NRF_BLE_SCAN_EVT_CONNECTED:
+         {
+              ble_gap_evt_connected_t const * p_connected =
+                               p_scan_evt->params.connected.p_connected;
+             // Scan is automatically stopped by the connection.
+             NRF_LOG_INFO("Connecting to target %02x%02x%02x%02x%02x%02x",
+                      p_connected->peer_addr.addr[0],
+                      p_connected->peer_addr.addr[1],
+                      p_connected->peer_addr.addr[2],
+                      p_connected->peer_addr.addr[3],
+                      p_connected->peer_addr.addr[4],
+                      p_connected->peer_addr.addr[5]
+                      );
+         } break;
+
+         case NRF_BLE_SCAN_EVT_SCAN_TIMEOUT:
+         {
+             NRF_LOG_INFO("Scan timed out.");
+             scan_start();
+         } break;
+
+         default:
+             break;
+    }
+}
+
+
+/**@brief Function for initializing the scanning and setting the filters.
+ */
+static void scan_init(void)
+{
+    ret_code_t          err_code;
+    nrf_ble_scan_init_t init_scan;
+
+    memset(&init_scan, 0, sizeof(init_scan));
+
+    init_scan.connect_if_match = true;
+    init_scan.conn_cfg_tag     = APP_BLE_CONN_CFG_TAG;
+
+    err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_scan_filter_set(&m_scan, SCAN_UUID_FILTER, &m_nus_uuid);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_scan_filters_enable(&m_scan, NRF_BLE_SCAN_UUID_FILTER, false);
+    APP_ERROR_CHECK(err_code);
+}
+
+
 /**@brief Function for handling database discovery events.
  *
- * @details This function is callback function to handle events from the database discovery module.
- *          Depending on the UUIDs that are discovered, this function should forward the events
+ * @details This function is a callback function to handle events from the database discovery module.
+ *          Depending on the UUIDs that are discovered, this function forwards the events
  *          to their respective services.
  *
  * @param[in] p_event  Pointer to the database discovery event.
  */
 static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
 {
-    ble_hrs_on_db_disc_evt(&m_hrs_c, p_evt);
-    ble_bas_on_db_disc_evt(&m_bas_c, p_evt);
+    ble_nus_c_on_db_disc_evt(&m_ble_nus_c, p_evt);
 }
 
 
-/**@brief Function for handling Peer Manager events.
+/**@brief Function for handling characters received by the Nordic UART Service (NUS).
  *
- * @param[in] p_evt  Peer Manager event.
+ * @details This function takes a list of characters of length data_len and prints the characters out on UART.
+ *          If @ref ECHOBACK_BLE_UART_DATA is set, the data is sent back to sender.
  */
-static void pm_evt_handler(pm_evt_t const * p_evt)
+static void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_len)
 {
-    pm_handler_on_pm_evt(p_evt);
-    pm_handler_disconnect_on_sec_failure(p_evt);
-    pm_handler_flash_clean(p_evt);
+    ret_code_t ret_val;
 
-    switch (p_evt->evt_id)
+    NRF_LOG_DEBUG("Receiving data.");
+    NRF_LOG_HEXDUMP_DEBUG(p_data, data_len);
+
+    for (uint32_t i = 0; i < data_len; i++)
     {
-        case PM_EVT_PEERS_DELETE_SUCCEEDED:
-            // Bonds are deleted. Start scanning.
-            scan_start();
+        do
+        {
+            ret_val = app_uart_put(p_data[i]);
+            if ((ret_val != NRF_SUCCESS) && (ret_val != NRF_ERROR_BUSY))
+            {
+                NRF_LOG_ERROR("app_uart_put failed for index 0x%04x.", i);
+                APP_ERROR_CHECK(ret_val);
+            }
+        } while (ret_val == NRF_ERROR_BUSY);
+    }
+    if (p_data[data_len-1] == '\r')
+    {
+        while (app_uart_put('\n') == NRF_ERROR_BUSY);
+    }
+    if (ECHOBACK_BLE_UART_DATA)
+    {
+        // Send data back to the peripheral.
+        do
+        {
+            ret_val = ble_nus_c_string_send(&m_ble_nus_c, p_data, data_len);
+            if ((ret_val != NRF_SUCCESS) && (ret_val != NRF_ERROR_BUSY))
+            {
+                NRF_LOG_ERROR("Failed sending NUS message. Error 0x%x. ", ret_val);
+                APP_ERROR_CHECK(ret_val);
+            }
+        } while (ret_val == NRF_ERROR_BUSY);
+    }
+}
+
+
+/**@brief   Function for handling app_uart events.
+ *
+ * @details This function receives a single character from the app_uart module and appends it to
+ *          a string. The string is sent over BLE when the last character received is a
+ *          'new line' '\n' (hex 0x0A) or if the string reaches the maximum data length.
+ */
+void uart_event_handle(app_uart_evt_t * p_event)
+{
+    static uint8_t data_array[BLE_NUS_MAX_DATA_LEN];
+    static uint16_t index = 0;
+    uint32_t ret_val;
+
+    switch (p_event->evt_type)
+    {
+        /**@snippet [Handling data from UART] */
+        case APP_UART_DATA_READY:
+            UNUSED_VARIABLE(app_uart_get(&data_array[index]));
+            index++;
+
+            if ((data_array[index - 1] == '\n') ||
+                (data_array[index - 1] == '\r') ||
+                (index >= (m_ble_nus_max_data_len)))
+            {
+                NRF_LOG_DEBUG("Ready to send data over BLE NUS");
+                NRF_LOG_HEXDUMP_DEBUG(data_array, index);
+
+                do
+                {
+                    ret_val = ble_nus_c_string_send(&m_ble_nus_c, data_array, index);
+                    if ( (ret_val != NRF_ERROR_INVALID_STATE) && (ret_val != NRF_ERROR_RESOURCES) )
+                    {
+                        APP_ERROR_CHECK(ret_val);
+                    }
+                } while (ret_val == NRF_ERROR_RESOURCES);
+
+                index = 0;
+            }
+            break;
+
+        /**@snippet [Handling data from UART] */
+        case APP_UART_COMMUNICATION_ERROR:
+            NRF_LOG_ERROR("Communication error occurred while handling UART.");
+            APP_ERROR_HANDLER(p_event->data.error_communication);
+            break;
+
+        case APP_UART_FIFO_ERROR:
+            NRF_LOG_ERROR("Error occurred in FIFO module used by UART.");
+            APP_ERROR_HANDLER(p_event->data.error_code);
             break;
 
         default:
@@ -377,8 +312,46 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 }
 
 
+/**@brief Callback handling Nordic UART Service (NUS) client events.
+ *
+ * @details This function is called to notify the application of NUS client events.
+ *
+ * @param[in]   p_ble_nus_c   NUS client handle. This identifies the NUS client.
+ * @param[in]   p_ble_nus_evt Pointer to the NUS client event.
+ */
+
+/**@snippet [Handling events from the ble_nus_c module] */
+static void ble_nus_c_evt_handler(ble_nus_c_t * p_ble_nus_c, ble_nus_c_evt_t const * p_ble_nus_evt)
+{
+    ret_code_t err_code;
+
+    switch (p_ble_nus_evt->evt_type)
+    {
+        case BLE_NUS_C_EVT_DISCOVERY_COMPLETE:
+            NRF_LOG_INFO("Discovery complete.");
+            err_code = ble_nus_c_handles_assign(p_ble_nus_c, p_ble_nus_evt->conn_handle, &p_ble_nus_evt->handles);
+            APP_ERROR_CHECK(err_code);
+
+            err_code = ble_nus_c_tx_notif_enable(p_ble_nus_c);
+            APP_ERROR_CHECK(err_code);
+            NRF_LOG_INFO("Connected to device with Nordic UART Service.");
+            break;
+
+        case BLE_NUS_C_EVT_NUS_TX_EVT:
+            ble_nus_chars_received_uart_print(p_ble_nus_evt->p_data, p_ble_nus_evt->data_len);
+            break;
+
+        case BLE_NUS_C_EVT_DISCONNECTED:
+            NRF_LOG_INFO("Disconnected.");
+            scan_start();
+            break;
+    }
+}
+/**@snippet [Handling events from the ble_nus_c module] */
+
+
 /**
- * @brief Function for shutdown events.
+ * @brief Function for handling shutdown events.
  *
  * @param[in]   event       Shutdown type.
  */
@@ -396,6 +369,7 @@ static bool shutdown_handler(nrf_pwr_mgmt_evt_t event)
             err_code = bsp_btn_ble_sleep_mode_prepare();
             APP_ERROR_CHECK(err_code);
             break;
+
         default:
             break;
     }
@@ -405,11 +379,6 @@ static bool shutdown_handler(nrf_pwr_mgmt_evt_t event)
 
 NRF_PWR_MGMT_HANDLER_REGISTER(shutdown_handler, APP_SHUTDOWN_HANDLER_PRIORITY);
 
-
-static void sbms_reader(ble_evt_t const *p_ble_evt)
-{
-    NRF_LOG_INFO("temp is %d.%d",p_ble_evt->evt.gattc_evt.params.hvx.data[1],p_ble_evt->evt.gattc_evt.params.hvx.data[2]);
-}
 
 /**@brief Function for handling BLE events.
  *
@@ -424,39 +393,36 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-        {
-            NRF_LOG_INFO("Connected.");
-            sbms_reader(p_ble_evt);
-            // Discover peer's services.
-            err_code = ble_db_discovery_start(&m_db_disc, p_ble_evt->evt.gap_evt.conn_handle);
+            err_code = ble_nus_c_handles_assign(&m_ble_nus_c, p_ble_evt->evt.gap_evt.conn_handle, NULL);
             APP_ERROR_CHECK(err_code);
 
             err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             APP_ERROR_CHECK(err_code);
 
-        } break;
+            // start discovery of services. The NUS Client waits for a discovery result
+            err_code = ble_db_discovery_start(&m_db_disc, p_ble_evt->evt.gap_evt.conn_handle);
+            APP_ERROR_CHECK(err_code);
+            break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-        {
-            NRF_LOG_INFO("Disconnected, reason 0x%x.",
+
+            NRF_LOG_INFO("Disconnected. conn_handle: 0x%x, reason: 0x%x",
+                         p_gap_evt->conn_handle,
                          p_gap_evt->params.disconnected.reason);
-
-            err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-            APP_ERROR_CHECK(err_code);
-
-            if (ble_conn_state_central_conn_count() < NRF_SDH_BLE_CENTRAL_LINK_COUNT)
-            {
-                scan_start();
-            }
-        } break;
+            break;
 
         case BLE_GAP_EVT_TIMEOUT:
-        {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
             {
                 NRF_LOG_INFO("Connection Request timed out.");
             }
-        } break;
+            break;
+
+        case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
+            // Pairing not supported.
+            err_code = sd_ble_gap_sec_params_reply(p_ble_evt->evt.gap_evt.conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
+            APP_ERROR_CHECK(err_code);
+            break;
 
         case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
             // Accepting parameters requested by peer.
@@ -492,56 +458,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
             break;
-    
-        case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-            NRF_LOG_DEBUG("BLE_GAP_EVT_SEC_PARAMS_REQUEST");
-            break;
-
-        case BLE_GAP_EVT_AUTH_KEY_REQUEST:
-            NRF_LOG_INFO("BLE_GAP_EVT_AUTH_KEY_REQUEST");
-            break;
-
-        case BLE_GAP_EVT_LESC_DHKEY_REQUEST:
-            NRF_LOG_INFO("BLE_GAP_EVT_LESC_DHKEY_REQUEST");
-            break;
-
-         case BLE_GAP_EVT_AUTH_STATUS:
-             NRF_LOG_INFO("BLE_GAP_EVT_AUTH_STATUS: status=0x%x bond=0x%x lv4: %d kdist_own:0x%x kdist_peer:0x%x",
-                          p_ble_evt->evt.gap_evt.params.auth_status.auth_status,
-                          p_ble_evt->evt.gap_evt.params.auth_status.bonded,
-                          p_ble_evt->evt.gap_evt.params.auth_status.sm1_levels.lv4,
-                          *((uint8_t *)&p_ble_evt->evt.gap_evt.params.auth_status.kdist_own),
-                          *((uint8_t *)&p_ble_evt->evt.gap_evt.params.auth_status.kdist_peer));
-            break;
 
         default:
-            break;
-    }
-}
-
-
-/**@brief SoftDevice SoC event handler.
- *
- * @param[in]   evt_id      SoC event.
- * @param[in]   p_context   Context.
- */
-static void soc_evt_handler(uint32_t evt_id, void * p_context)
-{
-    switch (evt_id)
-    {
-        case NRF_EVT_FLASH_OPERATION_SUCCESS:
-            /* fall through */
-        case NRF_EVT_FLASH_OPERATION_ERROR:
-
-            if (m_memory_access_in_progress)
-            {
-                m_memory_access_in_progress = false;
-                scan_start();
-            }
-            break;
-
-        default:
-            // No implementation needed.
             break;
     }
 }
@@ -568,77 +486,40 @@ static void ble_stack_init(void)
     err_code = nrf_sdh_ble_enable(&ram_start);
     APP_ERROR_CHECK(err_code);
 
-    // Register handlers for BLE and SoC events.
+    // Register a handler for BLE events.
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
-    NRF_SDH_SOC_OBSERVER(m_soc_observer, APP_SOC_OBSERVER_PRIO, soc_evt_handler, NULL);
 }
 
 
-
-/**@brief Function for the Peer Manager initialization.
- */
-static void peer_manager_init(void)
+/**@brief Function for handling events from the GATT library. */
+void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
 {
-    ble_gap_sec_params_t sec_param;
-    ret_code_t err_code;
-
-    err_code = pm_init();
-    APP_ERROR_CHECK(err_code);
-
-    memset(&sec_param, 0, sizeof(ble_gap_sec_params_t));
-
-    // Security parameters to be used for all security procedures.
-    sec_param.bond           = SEC_PARAM_BOND;
-    sec_param.mitm           = SEC_PARAM_MITM;
-    sec_param.lesc           = SEC_PARAM_LESC;
-    sec_param.keypress       = SEC_PARAM_KEYPRESS;
-    sec_param.io_caps        = SEC_PARAM_IO_CAPABILITIES;
-    sec_param.oob            = SEC_PARAM_OOB;
-    sec_param.min_key_size   = SEC_PARAM_MIN_KEY_SIZE;
-    sec_param.max_key_size   = SEC_PARAM_MAX_KEY_SIZE;
-    sec_param.kdist_own.enc  = 1;
-    sec_param.kdist_own.id   = 1;
-    sec_param.kdist_peer.enc = 1;
-    sec_param.kdist_peer.id  = 1;
-
-    err_code = pm_sec_params_set(&sec_param);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = pm_register(pm_evt_handler);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/** @brief Clear bonding information from persistent storage
- */
-static void delete_bonds(void)
-{
-    ret_code_t err_code;
-
-    NRF_LOG_INFO("Erase bonds!");
-
-    err_code = pm_peers_delete();
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for disabling the use of whitelist for scanning.
- */
-static void whitelist_disable(void)
-{
-    if (!m_whitelist_disabled)
+    if (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)
     {
-        NRF_LOG_INFO("Whitelist temporarily disabled.");
-        m_whitelist_disabled = true;
-        nrf_ble_scan_stop();
-        scan_start();
+        NRF_LOG_INFO("ATT MTU exchange completed.");
+
+        m_ble_nus_max_data_len = p_evt->params.att_mtu_effective - OPCODE_LENGTH - HANDLE_LENGTH;
+        NRF_LOG_INFO("Ble NUS max data length set to 0x%X(%d)", m_ble_nus_max_data_len, m_ble_nus_max_data_len);
     }
+}
+
+
+/**@brief Function for initializing the GATT library. */
+void gatt_init(void)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_ble_gatt_init(&m_gatt, gatt_evt_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_ble_gatt_att_mtu_central_set(&m_gatt, NRF_SDH_BLE_GATT_MAX_MTU_SIZE);
+    APP_ERROR_CHECK(err_code);
 }
 
 
 /**@brief Function for handling events from the BSP module.
  *
- * @param[in]   event   Event generated by button press.
+ * @param[in] event  Event generated by button press.
  */
 void bsp_event_handler(bsp_event_t event)
 {
@@ -651,282 +532,84 @@ void bsp_event_handler(bsp_event_t event)
             break;
 
         case BSP_EVENT_DISCONNECT:
-            err_code = sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            err_code = sd_ble_gap_disconnect(m_ble_nus_c.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             if (err_code != NRF_ERROR_INVALID_STATE)
             {
                 APP_ERROR_CHECK(err_code);
             }
             break;
 
-        case BSP_EVENT_WHITELIST_OFF:
-            whitelist_disable();
-            break;
-
         default:
             break;
     }
 }
 
-
-/**@brief Heart Rate Collector Handler.
- */
-static void hrs_c_evt_handler(ble_hrs_c_t * p_hrs_c, ble_hrs_c_evt_t * p_hrs_c_evt)
+/**@brief Function for initializing the UART. */
+static void uart_init(void)
 {
     ret_code_t err_code;
 
-    switch (p_hrs_c_evt->evt_type)
+    app_uart_comm_params_t const comm_params =
     {
-        case BLE_HRS_C_EVT_DISCOVERY_COMPLETE:
-        {
-            NRF_LOG_DEBUG("Heart rate service discovered.");
+        .rx_pin_no    = RX_PIN_NUMBER,
+        .tx_pin_no    = TX_PIN_NUMBER,
+        .rts_pin_no   = RTS_PIN_NUMBER,
+        .cts_pin_no   = CTS_PIN_NUMBER,
+        .flow_control = APP_UART_FLOW_CONTROL_DISABLED,
+        .use_parity   = false,
+        .baud_rate    = UART_BAUDRATE_BAUDRATE_Baud115200
+    };
 
-            err_code = ble_hrs_c_handles_assign(p_hrs_c,
-                                                p_hrs_c_evt->conn_handle,
-                                                &p_hrs_c_evt->params.peer_db);
-            APP_ERROR_CHECK(err_code);
+    APP_UART_FIFO_INIT(&comm_params,
+                       UART_RX_BUF_SIZE,
+                       UART_TX_BUF_SIZE,
+                       uart_event_handle,
+                       APP_IRQ_PRIORITY_LOWEST,
+                       err_code);
+    NRF_LOG_INFO("TOMATOS");
 
-            // Heart rate service discovered. Enable notification of Heart Rate Measurement.
-            err_code = ble_hrs_c_hrm_notif_enable(p_hrs_c);
-            APP_ERROR_CHECK(err_code);
-        } break;
+    APP_ERROR_CHECK(err_code);
+}
 
-        case BLE_HRS_C_EVT_HRM_NOTIFICATION:
-        {
-            NRF_LOG_INFO("Heart Rate = %d.", p_hrs_c_evt->params.hrm.hr_value);
+/**@brief Function for initializing the Nordic UART Service (NUS) client. */
+static void nus_c_init(void)
+{
+    ret_code_t       err_code;
+    ble_nus_c_init_t init;
 
-            if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
-            {
-                uint32_t rr_avg = 0;
-                for (uint32_t i = 0; i < p_hrs_c_evt->params.hrm.rr_intervals_cnt; i++)
-                {
-                    rr_avg += p_hrs_c_evt->params.hrm.rr_intervals[i];
-                }
-                rr_avg = rr_avg / p_hrs_c_evt->params.hrm.rr_intervals_cnt;
-                NRF_LOG_DEBUG("rr_interval (avg) = %d.", rr_avg);
-            }
-        } break;
+    init.evt_handler   = ble_nus_c_evt_handler;
+    init.error_handler = nus_error_handler;
+    init.p_gatt_queue  = &m_ble_gatt_queue;
 
-        default:
-            break;
-    }
+    err_code = ble_nus_c_init(&m_ble_nus_c, &init);
+    APP_ERROR_CHECK(err_code);
 }
 
 
-/**@brief Battery level Collector Handler.
- */
-static void bas_c_evt_handler(ble_bas_c_t * p_bas_c, ble_bas_c_evt_t * p_bas_c_evt)
+/**@brief Function for initializing buttons and leds. */
+static void buttons_leds_init(void)
 {
     ret_code_t err_code;
-
-    switch (p_bas_c_evt->evt_type)
-    {
-        case BLE_BAS_C_EVT_DISCOVERY_COMPLETE:
-        {
-            err_code = ble_bas_c_handles_assign(p_bas_c,
-                                                p_bas_c_evt->conn_handle,
-                                                &p_bas_c_evt->params.bas_db);
-            APP_ERROR_CHECK(err_code);
-
-            // Battery service discovered. Enable notification of Battery Level.
-            NRF_LOG_DEBUG("Battery Service discovered. Reading battery level.");
-
-            err_code = ble_bas_c_bl_read(p_bas_c);
-            APP_ERROR_CHECK(err_code);
-
-            NRF_LOG_DEBUG("Enabling Battery Level Notification.");
-            err_code = ble_bas_c_bl_notif_enable(p_bas_c);
-            APP_ERROR_CHECK(err_code);
-
-        } break;
-
-        case BLE_BAS_C_EVT_BATT_NOTIFICATION:
-            NRF_LOG_INFO("Battery Level received %d %%.", p_bas_c_evt->params.battery_level);
-            break;
-
-        case BLE_BAS_C_EVT_BATT_READ_RESP:
-            NRF_LOG_INFO("Battery Level Read as %d %%.", p_bas_c_evt->params.battery_level);
-            break;
-
-        default:
-            break;
-    }
-}
-
-
-/**
- * @brief Heart rate collector initialization.
- */
-static void hrs_c_init(void)
-{
-    ble_hrs_c_init_t hrs_c_init_obj;
-
-    hrs_c_init_obj.evt_handler   = hrs_c_evt_handler;
-    hrs_c_init_obj.error_handler = service_error_handler;
-    hrs_c_init_obj.p_gatt_queue  = &m_ble_gatt_queue;
-
-    ret_code_t err_code = ble_hrs_c_init(&m_hrs_c, &hrs_c_init_obj);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**
- * @brief Battery level collector initialization.
- */
-static void bas_c_init(void)
-{
-    ble_bas_c_init_t bas_c_init_obj;
-
-    bas_c_init_obj.evt_handler   = bas_c_evt_handler;
-    bas_c_init_obj.error_handler = service_error_handler;
-    bas_c_init_obj.p_gatt_queue  = &m_ble_gatt_queue;
-
-    ret_code_t err_code = ble_bas_c_init(&m_bas_c, &bas_c_init_obj);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**
- * @brief Database discovery collector initialization.
- */
-static void db_discovery_init(void)
-{
-    ble_db_discovery_init_t db_init;
-
-    memset(&db_init, 0, sizeof(db_init));
-
-    db_init.evt_handler  = db_disc_handler;
-    db_init.p_gatt_queue = &m_ble_gatt_queue;
-
-    ret_code_t err_code = ble_db_discovery_init(&db_init);
-
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Retrieve a list of peer manager peer IDs.
- *
- * @param[inout] p_peers   The buffer where to store the list of peer IDs.
- * @param[inout] p_size    In: The size of the @p p_peers buffer.
- *                         Out: The number of peers copied in the buffer.
- */
-static void peer_list_get(pm_peer_id_t * p_peers, uint32_t * p_size)
-{
-    pm_peer_id_t peer_id;
-    uint32_t     peers_to_copy;
-
-    peers_to_copy = (*p_size < BLE_GAP_WHITELIST_ADDR_MAX_COUNT) ?
-                     *p_size : BLE_GAP_WHITELIST_ADDR_MAX_COUNT;
-
-    peer_id = pm_next_peer_id_get(PM_PEER_ID_INVALID);
-    *p_size = 0;
-
-    while ((peer_id != PM_PEER_ID_INVALID) && (peers_to_copy--))
-    {
-        p_peers[(*p_size)++] = peer_id;
-        peer_id = pm_next_peer_id_get(peer_id);
-    }
-}
-
-
-static void whitelist_load()
-{
-    ret_code_t   ret;
-    pm_peer_id_t peers[8];
-    uint32_t     peer_cnt;
-
-    memset(peers, PM_PEER_ID_INVALID, sizeof(peers));
-    peer_cnt = (sizeof(peers) / sizeof(pm_peer_id_t));
-
-    // Load all peers from flash and whitelist them.
-    peer_list_get(peers, &peer_cnt);
-
-    ret = pm_whitelist_set(peers, peer_cnt);
-    APP_ERROR_CHECK(ret);
-
-    // Setup the device identies list.
-    // Some SoftDevices do not support this feature.
-    ret = pm_device_identities_list_set(peers, peer_cnt);
-    if (ret != NRF_ERROR_NOT_SUPPORTED)
-    {
-        APP_ERROR_CHECK(ret);
-    }
-}
-
-
-static void on_whitelist_req(void)
-{
-    ret_code_t err_code;
-
-    // Whitelist buffers.
-    ble_gap_addr_t whitelist_addrs[8];
-    ble_gap_irk_t  whitelist_irks[8];
-
-    memset(whitelist_addrs, 0x00, sizeof(whitelist_addrs));
-    memset(whitelist_irks,  0x00, sizeof(whitelist_irks));
-
-    uint32_t addr_cnt = (sizeof(whitelist_addrs) / sizeof(ble_gap_addr_t));
-    uint32_t irk_cnt  = (sizeof(whitelist_irks)  / sizeof(ble_gap_irk_t));
-
-    // Reload the whitelist and whitelist all peers.
-    whitelist_load();
-
-    // Get the whitelist previously set using pm_whitelist_set().
-    err_code = pm_whitelist_get(whitelist_addrs, &addr_cnt,
-                                whitelist_irks,  &irk_cnt);
-
-    if (((addr_cnt == 0) && (irk_cnt == 0)) ||
-        (m_whitelist_disabled))
-    {
-        // Don't use whitelist.
-        err_code = nrf_ble_scan_params_set(&m_scan, NULL);
-        APP_ERROR_CHECK(err_code);
-    }
-}
-
-
-/**@brief Function to start scanning.
- */
-static void scan_start(void)
-{
-    ret_code_t err_code;
-
-    if (nrf_fstorage_is_busy(NULL))
-    {
-        m_memory_access_in_progress = true;
-        return;
-    }
-
-    NRF_LOG_INFO("Starting scan.");
-
-    err_code = nrf_ble_scan_start(&m_scan);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = bsp_indication_set(BSP_INDICATE_SCANNING);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for initializing buttons and leds.
- *
- * @param[out] p_erase_bonds  Will be true if the clear bonding button was pressed to wake the application up.
- */
-static void buttons_leds_init(bool * p_erase_bonds)
-{
-    ret_code_t  err_code;
     bsp_event_t startup_event;
 
-    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
+    err_code = bsp_init(BSP_INIT_LEDS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
 
     err_code = bsp_btn_ble_init(NULL, &startup_event);
     APP_ERROR_CHECK(err_code);
-
-    *p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
 }
 
 
-/**@brief Function for initializing the nrf log module.
- */
+/**@brief Function for initializing the timer. */
+static void timer_init(void)
+{
+    ret_code_t err_code = app_timer_init();
+    APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for initializing the nrf log module. */
 static void log_init(void)
 {
     ret_code_t err_code = NRF_LOG_INIT(NULL);
@@ -936,7 +619,8 @@ static void log_init(void)
 }
 
 
-/**@brief Function for initializing the power management module. */
+/**@brief Function for initializing power management.
+ */
 static void power_management_init(void)
 {
     ret_code_t err_code;
@@ -945,455 +629,57 @@ static void power_management_init(void)
 }
 
 
-/**@brief GATT module event handler.
- */
-static void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
+/** @brief Function for initializing the database discovery module. */
+static void db_discovery_init(void)
 {
-    switch (p_evt->evt_id)
-    {
-        case NRF_BLE_GATT_EVT_ATT_MTU_UPDATED:
-        {
-            NRF_LOG_INFO("GATT ATT MTU on connection 0x%x changed to %d.",
-                         p_evt->conn_handle,
-                         p_evt->params.att_mtu_effective);
-        } break;
+    ble_db_discovery_init_t db_init;
 
-        case NRF_BLE_GATT_EVT_DATA_LENGTH_UPDATED:
-        {
-            NRF_LOG_INFO("Data length for connection 0x%x updated to %d.",
-                         p_evt->conn_handle,
-                         p_evt->params.data_length);
-        } break;
+    memset(&db_init, 0, sizeof(ble_db_discovery_init_t));
 
-        default:
-            break;
-    }
-}
+    db_init.evt_handler  = db_disc_handler;
+    db_init.p_gatt_queue = &m_ble_gatt_queue;
 
-
-static void scan_evt_handler(scan_evt_t const * p_scan_evt)
-{
-    ret_code_t err_code;
-    switch(p_scan_evt->scan_evt_id)
-    {
-        case NRF_BLE_SCAN_EVT_WHITELIST_REQUEST:
-        {
-            on_whitelist_req();
-            m_whitelist_disabled = false;
-        } break;
-
-        case NRF_BLE_SCAN_EVT_CONNECTING_ERROR:
-        {
-            err_code = p_scan_evt->params.connecting_err.err_code;
-            APP_ERROR_CHECK(err_code);
-        } break;
-
-        case NRF_BLE_SCAN_EVT_SCAN_TIMEOUT:
-        {
-            NRF_LOG_INFO("Scan timed out.");
-            scan_start();
-        } break;
-
-        case NRF_BLE_SCAN_EVT_FILTER_MATCH:
-            break;
-        case NRF_BLE_SCAN_EVT_WHITELIST_ADV_REPORT:
-            break;
-
-        default:
-          break;
-    }
-}
-
-
-/**@brief Function for initializing the timer.
- */
-static void timer_init(void)
-{
-    ret_code_t err_code = app_timer_init();
+    ret_code_t err_code = ble_db_discovery_init(&db_init);
     APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for initializing the GATT module.
- */
-static void gatt_init(void)
-{
-    ret_code_t err_code = nrf_ble_gatt_init(&m_gatt, gatt_evt_handler);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for initialization scanning and setting filters.
- */
-static void scan_init(void)
-{
-    ret_code_t          err_code;
-    nrf_ble_scan_init_t init_scan;
-
-    memset(&init_scan, 0, sizeof(init_scan));
-
-    init_scan.p_scan_param     = &m_scan_param;
-    init_scan.connect_if_match = true;
-    init_scan.conn_cfg_tag     = APP_BLE_CONN_CFG_TAG;
-
-    err_code = nrf_ble_scan_init(&m_scan, &init_scan, scan_evt_handler);
-    APP_ERROR_CHECK(err_code);
-
-    ble_uuid_t uuid =
-    {
-        .uuid = TARGET_UUID,
-        .type = BLE_UUID_TYPE_BLE,
-    };
-
-    err_code = nrf_ble_scan_filter_set(&m_scan,
-                                       SCAN_UUID_FILTER,
-                                       &uuid);
-    APP_ERROR_CHECK(err_code);
-
-    if (strlen(m_target_periph_name) != 0)
-    {
-        err_code = nrf_ble_scan_filter_set(&m_scan,
-                                           SCAN_NAME_FILTER,
-                                           m_target_periph_name);
-        APP_ERROR_CHECK(err_code);
-    }
-
-    if (is_connect_per_addr)
-    {
-       err_code = nrf_ble_scan_filter_set(&m_scan,
-                                          SCAN_ADDR_FILTER,
-                                          m_target_periph_addr.addr);
-       APP_ERROR_CHECK(err_code);
-    }
-
-    err_code = nrf_ble_scan_filters_enable(&m_scan,
-                                           NRF_BLE_SCAN_ALL_FILTER,
-                                           false);
-    APP_ERROR_CHECK(err_code);
-
 }
 
 
 /**@brief Function for handling the idle state (main loop).
  *
- * @details Handle any pending log operation(s), then sleep until the next event occurs.
+ * @details Handles any pending log operations, then sleeps until the next event occurs.
  */
 static void idle_state_handle(void)
 {
-    ret_code_t err_code;
-    
-    err_code = nrf_ble_lesc_request_handler();
-    APP_ERROR_CHECK(err_code);
-    
-    NRF_LOG_FLUSH();
-    nrf_pwr_mgmt_run();
-}
-
-
-/**@brief Function for starting a scan, or instead trigger it from peer manager (after
- *        deleting bonds).
- *
- * @param[in] p_erase_bonds Pointer to a bool to determine if bonds will be deleted before scanning.
- */
-void scanning_start(bool * p_erase_bonds)
-{
-    // Start scanning for peripherals and initiate connection
-    // with devices that advertise GATT Service UUID.
-    if (*p_erase_bonds == true)
+    if (NRF_LOG_PROCESS() == false)
     {
-        // Scan is started by the PM_EVT_PEERS_DELETE_SUCCEEDED event.
-        delete_bonds();
-    }
-    else
-    {
-        scan_start();
+        nrf_pwr_mgmt_run();
     }
 }
 
-
-uint32_t smbs_handles_assign(ble_gattc_evt_hvx_t    * smbs,
-                                  uint16_t         conn_handle,
-                                  const uint16_t * smbs_handles)
-{
-    VERIFY_PARAM_NOT_NULL(smbs);
-
-    smbs->type = conn_handle;
-    if (smbs_handles != NULL)
-    {
-        smbs->handle = * smbs_handles;
-    }
-
-    return NRF_SUCCESS;
-}
-
-
-static void smbs_evt_handler(ble_gatts_hvx_params_t * smbs,ble_gattc_evt_hvx_t smbs_evt_handler)
-{
-    //ret_code_t err_code;
-
-    switch (smbs_evt_handler.type)
-    {
-        // case BLE_HRS_C_EVT_DISCOVERY_COMPLETE:
-        // {
-        //     NRF_LOG_DEBUG("Heart rate service discovered.");
-
-        //     err_code = ble_hrs_c_handles_assign(smbs,
-        //                                         smbs->handle,
-        //                                         &p_hrs_c_evt->params.peer_db);
-        //     APP_ERROR_CHECK(err_code);
-
-        //     // Heart rate service discovered. Enable notification of Heart Rate Measurement.
-        //     err_code = ble_hrs_c_hrm_notif_enable(p_hrs_c);
-        //     APP_ERROR_CHECK(err_code);
-        // } break;
-
-        case BLE_GATT_HVX_NOTIFICATION:
-        {
-            NRF_LOG_INFO("Heart Rate = %d.%d", smbs->p_data[0],smbs->p_data[1]);
-
-            // if (p_hrs_c_evt->params.hrm.rr_intervals_cnt != 0)
-            // {
-            //     uint32_t rr_avg = 0;
-            //     for (uint32_t i = 0; i < p_hrs_c_evt->params.hrm.rr_intervals_cnt; i++)
-            //     {
-            //         rr_avg += p_hrs_c_evt->params.hrm.rr_intervals[i];
-            //     }
-            //     rr_avg = rr_avg / p_hrs_c_evt->params.hrm.rr_intervals_cnt;
-            //     NRF_LOG_DEBUG("rr_interval (avg) = %d.", rr_avg);
-            // }
-        } break;
-
-        default:
-            break;
-    }
-}
-
-typedef void (* smbs_evt_handler_t) (ble_gatts_hvx_params_t * p_ble_hrs_c,ble_gattc_evt_hvx_t smbs_evt_handler);
-
-typedef struct
-{
-    ble_gattc_evt_hvx_t char_evt;
-    smbs_evt_handler_t  evt_handler;   /**< Event handler to be called by the Heart Rate Client module when there is an event related to the Heart Rate Service. */
-    ble_srv_error_handler_t   error_handler; /**< Function to be called in case of an error. */
-    nrf_ble_gq_t            * p_gatt_queue;  /**< Pointer to the BLE GATT Queue instance. */
-} smbs_init_t;
-
-uint32_t ble_smbs_init(ble_gatts_hvx_params_t * p_ble_hrs_c, smbs_init_t * p_ble_hrs_c_init)
-{
-    VERIFY_PARAM_NOT_NULL(p_ble_hrs_c);
-    VERIFY_PARAM_NOT_NULL(p_ble_hrs_c_init);
-
-    ble_uuid_t hrs_uuid;
-
-    hrs_uuid.type = BLE_GATTS_SRVC_TYPE_PRIMARY;
-    hrs_uuid.uuid = 0x1234;
-
-    p_ble_hrs_c->handle                 = p_ble_hrs_c_init->char_evt.handle;
-    //p_ble_hrs_c->error_handler               = p_ble_hrs_c_init->error_handler;
-    //p_ble_hrs_c->p_gatt_queue                = p_ble_hrs_c_init->p_gatt_queue;
-    //p_ble_hrs_c->conn_handle                 = BLE_CONN_HANDLE_INVALID;
-    //p_ble_hrs_c->peer_hrs_db.hrm_cccd_handle = BLE_GATT_HANDLE_INVALID;
-    //p_ble_hrs_c->peer_hrs_db.hrm_handle      = BLE_GATT_HANDLE_INVALID;
-    if(ble_db_discovery_evt_register(&hrs_uuid) == NRF_SUCCESS)
-    {
-        NRF_LOG_INFO("found %d",hrs_uuid.uuid);
-    }
- 
-    return ble_db_discovery_evt_register(&hrs_uuid);
-}
-
-#define HRM_FLAG_MASK_HR_16BIT  (0x01 << 0)           /**< Bit mask used to extract the type of heart rate value. This is used to find if the received heart rate is a 16 bit value or an 8 bit value. */
-
-static void on_hvx(ble_gatts_hvx_params_t * p_ble_hrs_c, const ble_evt_t * p_ble_evt)
-{
-    // Check if the event is on the link for this instance.
-    if (p_ble_hrs_c->handle != p_ble_evt->evt.gattc_evt.conn_handle)
-    {
-        NRF_LOG_DEBUG("Received HVX on link 0x%x, not associated to this instance. Ignore.",
-                      p_ble_evt->evt.gattc_evt.conn_handle);
-        return;
-    }
-
-    NRF_LOG_DEBUG("Received HVX on link 0x%x",
-    p_ble_evt->evt.gattc_evt.params.hvx.handle);
-
-    // Check if this is a heart rate notification.
-    if (p_ble_evt->evt.gattc_evt.params.hvx.handle == p_ble_hrs_c->handle)
-    {
-        ble_gattc_evt_hvx_t ble_hrs_c_evt;
-        uint32_t        index = 0;
-
-        ble_hrs_c_evt.type                    = BLE_HRS_C_EVT_HRM_NOTIFICATION;
-        ble_hrs_c_evt.handle                 = p_ble_hrs_c->handle;
-        //ble_hrs_c_evt.params.hrm.rr_intervals_cnt = 0;
-
-        if (!(p_ble_evt->evt.gattc_evt.params.hvx.data[index++] & HRM_FLAG_MASK_HR_16BIT))
-        {
-            // 8-bit heart rate value received.
-            ble_hrs_c_evt.data[1] = p_ble_evt->evt.gattc_evt.params.hvx.data[index++];  //lint !e415 suppress Lint Warning 415: Likely access out of bond
-        }
-        else
-        {
-            // 16-bit heart rate value received.
-            ble_hrs_c_evt.data[1] =
-                uint16_decode(&(p_ble_evt->evt.gattc_evt.params.hvx.data[index]));
-            index += sizeof(uint16_t);
-        }
-
-        // if ((p_ble_evt->evt.gattc_evt.params.hvx.data[0] & HRM_FLAG_MASK_HR_RR_INT))
-        // {
-        //     uint32_t i;
-        //     /*lint --e{415} --e{416} --e{662} --e{661} -save suppress Warning 415: possible access out of bond */
-        //     for (i = 0; i < BLE_HRS_C_RR_INTERVALS_MAX_CNT; i ++)
-        //     {
-        //         if (index >= p_ble_evt->evt.gattc_evt.params.hvx.len)
-        //         {
-        //             break;
-        //         }
-        //         ble_hrs_c_evt.params.hrm.rr_intervals[i] =
-        //             uint16_decode(&(p_ble_evt->evt.gattc_evt.params.hvx.data[index]));
-        //         index += sizeof(uint16_t);
-        //     }
-        //     /*lint -restore*/
-        //     ble_hrs_c_evt.params.hrm.rr_intervals_cnt = (uint8_t)i;
-        // }
-        //p_ble_hrs_c->evt_handler(p_ble_hrs_c, &ble_hrs_c_evt);
-        smbs_evt_handler(p_ble_hrs_c, ble_hrs_c_evt);
-    }
-}
-
-
-void sbms_on_ble_evt(ble_evt_t const * p_ble_evt, void * p_context)
-{
-    ble_gatts_hvx_params_t * p_ble_hrs_c = (ble_gatts_hvx_params_t *)p_context;
-
-    if ((p_ble_hrs_c == NULL) || (p_ble_evt == NULL))
-    {
-        return;
-    }
-
-    switch (p_ble_evt->header.evt_id)
-    {
-        case BLE_GATTC_EVT_HVX:
-            on_hvx(p_ble_hrs_c, p_ble_evt);
-            break;
-        default:
-            break;
-    }
-}
-
-
-#define BLE_SMBS_DEF(_name)                                                                        \
-static ble_gatts_hvx_params_t _name;                                                                           \
-NRF_SDH_BLE_OBSERVER(_name ## _obs,                                                                 \
-                     BLE_HRS_C_BLE_OBSERVER_PRIO,                                                   \
-                     sbms_on_ble_evt, &_name)
-
-BLE_SMBS_DEF(m_sbms);
-
-static void smbs_init(void)
-{
-    smbs_init_t hrs_c_init_obj;
-
-    hrs_c_init_obj.evt_handler   = smbs_evt_handler;
-    hrs_c_init_obj.error_handler = NULL;
-    hrs_c_init_obj.p_gatt_queue  = NULL;
-
-    ret_code_t err_code = ble_smbs_init(&m_sbms, &hrs_c_init_obj);
-    APP_ERROR_CHECK(err_code);
-}
 
 int main(void)
 {
-    bool erase_bonds;
     // Initialize.
     log_init();
     timer_init();
+    NRF_LOG_INFO("WHOREJKLRE:SWJGIFOSD:PNRFEKWL:j");
+    uart_init();
+    buttons_leds_init();
+    db_discovery_init();
     power_management_init();
-    buttons_leds_init(&erase_bonds);
     ble_stack_init();
     gatt_init();
-    peer_manager_init();
-    db_discovery_init();
-    hrs_c_init();
-    bas_c_init();
-    smbs_init();
-
+    nus_c_init();
     scan_init();
+
     // Start execution.
-    scanning_start(&erase_bonds);
+    printf("BLE UART central example started.\r\n");
+    NRF_LOG_INFO("BLE UART central example started.");
+    scan_start();
 
-    int Temp1 = 15;
-    int Temp2 = 17;
-    int Volt1 = 21;
-    int Volt2 = 23;
-
-    //Keep not sure exactly but breaks without
-    ret_code_t ret;
-    static const app_usbd_config_t usbd_config = {
-        .ev_state_proc = usbd_user_ev_handler
-    };
-
-    ret = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(ret);
-
-    ret = nrf_drv_clock_init();
-    APP_ERROR_CHECK(ret);
-    
-    nrf_drv_clock_lfclk_request(NULL);
-
-    //Check if available
-    while(!nrf_drv_clock_lfclk_is_running())
-    {
-         //Just waiting 
-    }
-
-    //get port
-    app_usbd_serial_num_generate();
-
-    ret = app_usbd_init(&usbd_config);
-    APP_ERROR_CHECK(ret);
-
-    app_usbd_class_inst_t const * class_cdc_acm = app_usbd_cdc_acm_class_inst_get(&m_app_cdc_acm);
-    ret = app_usbd_class_append(class_cdc_acm);
-    APP_ERROR_CHECK(ret);
-
-    if (USBD_POWER_DETECTION)
-    {
-        ret = app_usbd_power_events_enable();
-        APP_ERROR_CHECK(ret);
-    }
-    else
-    {
-        app_usbd_enable();
-        app_usbd_start();
-    }
-
-    while(true)
-    {
-        while (app_usbd_event_queue_process())
-        {
-             //Nothing to do 
-        }
-        //change flag when want to send
-        if(m_send_flag)
-        {
-            bsp_board_led_invert(0);
-
-            size_t size = sprintf(m_tx_buffer, "%u.%u,%u.%u\r\n", Temp1,Temp2,Volt1,Volt2);
-            ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, m_tx_buffer, size);
-
-        }  
-
-        UNUSED_RETURN_VALUE(NRF_LOG_PROCESS());
-         //Sleep CPU only if there was no interrupt since last loop processing 
-        __WFE();
-    }
     // Enter main loop.
     for (;;)
     {
         idle_state_handle();
     }
 }
-
-
