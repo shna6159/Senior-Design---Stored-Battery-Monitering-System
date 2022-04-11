@@ -10,7 +10,7 @@ make.exe all --print-data-base --no-builtin-variables --no-builtin-rules --quest
 make.exe: *** No rule to make target `all'.  Stop.
 
 
-# Make data base, printed on Sun Apr 10 11:09:56 2022
+# Make data base, printed on Mon Apr 11 00:56:49 2022
 
 # Variables
 
@@ -18,9 +18,9 @@ make.exe: *** No rule to make target `all'.  Stop.
 <D = $(patsubst %/,%,$(dir $<))
 # automatic
 ?F = $(notdir $?)
- 
 # makefile
 MAKEFLAGS = Rrqp
+ 
 # environment
 VSCODE_LOG_NATIVE = false
 # automatic
@@ -58,7 +58,7 @@ PROGRAMW6432 = C:\Program Files
 # environment
 PROGRAMDATA = C:\ProgramData
 # environment
-VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-c1f01d0e-d020-4e1e-99a9-d100aae71f82-sock
+VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-ea21f6ef-4e29-464b-902f-005891a3b865-sock
 # environment
 VSCODE_CWD = C:\Users\Nathan Zhao\AppData\Local\Programs\Microsoft VS Code
 # environment
@@ -84,7 +84,7 @@ ELECTRON_RUN_AS_NODE = 1
 # automatic
 %F = $(notdir $%)
 # environment
-CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_8672_EGENRITAPEWFJVEF
+CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_8216_DPHBQFPSSHTXHDAF
 # environment
 VSCODE_PIPE_LOGGING = true
 # environment
@@ -196,7 +196,7 @@ TERM = cygwin
 # environment
 FPS_BROWSER_APP_PROFILE_STRING = Internet Explorer
 # environment
-VSCODE_PID = 8672
+VSCODE_PID = 8216
 # environment
 USERDOMAIN_ROAMINGPROFILE = DESKTOP-J2GK0MG
 # variable set hash-table stats:
@@ -284,6 +284,6 @@ GNUmakefile:
 # strcache free: total = 0 / max = 0 / min = 4096 / avg = 0
  
 
-# Finished Make data base on Sun Apr 10 11:09:56 2022
+# Finished Make data base on Mon Apr 11 00:56:49 2022
 
  

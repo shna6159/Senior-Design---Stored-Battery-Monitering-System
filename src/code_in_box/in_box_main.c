@@ -21,6 +21,8 @@
 #include "nrf_delay.h"
 #include "math.h"
 
+#include "ble_nus.h"
+#include "app_uart.h"
 
 #include "nrf_drv_clock.h"
 #include "nrf_drv_rtc.h"
@@ -97,8 +99,9 @@
 #define UUID_VOLTAGE_2_CHAR 0x4514
 #define UUID_TEMPERATURE_1_CHAR 0x3456
 #define UUID_TEMPERATURE_2_CHAR 0x5678
+#define UUID_RTC_CONFIG_CHAR 0x9123
 // RTC_VAL_IN_SEC is actually given in seconds, so you can simply change 3 into whatever amount of seconds you want to use.
-#define RTC_VAL_IN_SEC  (5UL)                                        /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
+#define RTC_VAL_IN_SEC  (20UL)   //keep at 20 sec or higher  /**< Get Compare event COMPARE_TIME seconds after the counter starts from 0. */
 #define NUM_TEMPERATURE_PERIODS 1000
 
 #define SAADC_CHANNEL1 0
@@ -115,8 +118,11 @@
 //------------------------------------------------------------------------------------------
 const nrf_drv_rtc_t rtc = NRFX_RTC_INSTANCE(2); // Create a handle that will point to the RTC 2 of nrf device
 
+BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);   
 NRF_BLE_GATT_DEF(m_gatt); /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);   /**< Context for the Queued Write module.*/
+static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - OPCODE_LENGTH - HANDLE_LENGTH; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                /**< Handle of the current connection. */
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;           /**< Advertising handle used to identify an advertising set. */
@@ -127,6 +133,7 @@ ble_gatts_char_handles_t voltage_1_char_handles;     /** Voltage Sensor 1 Charac
 ble_gatts_char_handles_t voltage_2_char_handles;     /** Voltage Sensor 2 Characteristic */
 ble_gatts_char_handles_t temperature_1_char_handles; /** Temperature Sensor 1 Characteristic */
 ble_gatts_char_handles_t temperature_2_char_handles; /** Temperature Sensor 2 Characteristic */
+ble_gatts_char_handles_t rtc_config_char_handles;    /** RTC Configuration Characteristic */
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -219,7 +226,7 @@ static void ble_advertising_init(void)
     ble_uuid_t ble_uuid;
     ble_add_char_params_t add_char_params;
     ble_uuid128_t base_uuid = {UUID_BASE};
-    uint8_t uuid_type = BLE_UUID_TYPE_BLE;
+    uint8_t uuid_type;
     sd_ble_uuid_vs_add(&base_uuid, &uuid_type);
     ble_uuid.type = uuid_type;
     ble_uuid.uuid = UUID_SERVICE;
@@ -249,6 +256,9 @@ static void ble_advertising_init(void)
 
     add_char_params.uuid = UUID_TEMPERATURE_2_CHAR;
     characteristic_add(service_handle, &add_char_params, &temperature_2_char_handles); // Setup_temperature characteristic
+
+     add_char_params.uuid = UUID_RTC_CONFIG_CHAR;
+    characteristic_add(service_handle, &add_char_params, &rtc_config_char_handles); // setup_rtc_config characteristic
 
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
 
@@ -300,11 +310,96 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
     // APP_ERROR_HANDLER(nrf_error); // Ignore errors TODO:
 }
 
+
+static void ble_send(const uint8_t * str, size_t len){
+    nrf_delay_ms(1000);
+    static uint8_t data_array[BLE_NUS_MAX_DATA_LEN];
+    memcpy(data_array, str, len);
+    //const uint8_t test_string[] = "yest";
+    // static uint8_t index = 0;
+    uint32_t       err_code;
+
+    for(int index = 0; index <= BLE_NUS_MAX_DATA_LEN; index++){
+
+        if ((data_array[index - 1] == '\n') || (data_array[index - 1] == '\r') || (index >= m_ble_nus_max_data_len)){
+
+            if (index > 1){
+                NRF_LOG_DEBUG("Ready to send data over BLE NUS");
+                NRF_LOG_HEXDUMP_DEBUG(data_array, index);
+
+                do{
+                    uint16_t length = (uint16_t)index;
+                    err_code = ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);
+                    if ((err_code != NRF_ERROR_INVALID_STATE) &&
+                        (err_code != NRF_ERROR_RESOURCES) &&
+                        (err_code != NRF_ERROR_NOT_FOUND)){
+                        APP_ERROR_CHECK(err_code);
+                    }
+                } while (err_code == NRF_ERROR_RESOURCES);
+            }
+
+            break;
+        }
+    }
+}
+
+static uint32_t tapp_uart_put(uint8_t byte){
+    return NRF_SUCCESS;
+}
+
+/**@brief Function for handling the data from the Nordic UART Service.
+ *
+ * @details This function will process the data received from the Nordic UART BLE Service and send
+ *          it to the UART module.
+ *
+ * @param[in] p_evt       Nordic UART Service event.
+ */
+/**@snippet [Handling the data received over BLE] */
+static void nus_data_handler(ble_nus_evt_t * p_evt)
+{
+
+    if (p_evt->type == BLE_NUS_EVT_RX_DATA)
+    {
+        bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(500);
+        bsp_board_led_invert(UNEXPECTED_LED);
+        uint32_t err_code;
+
+        printf("Received data from BLE NUS. Writing data on UART.\r\n");
+        printf("%s\r\n", p_evt->params.rx_data.p_data);
+        NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+        
+
+
+        for (uint32_t i = 0; i < p_evt->params.rx_data.length; i++)
+        {
+            do
+            {
+                err_code = tapp_uart_put(p_evt->params.rx_data.p_data[i]);
+                if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
+                {
+                    NRF_LOG_ERROR("Failed receiving NUS message. Error 0x%x. ", err_code);
+                    APP_ERROR_CHECK(err_code);
+                }
+            } while (err_code == NRF_ERROR_BUSY);
+        }
+        if (p_evt->params.rx_data.p_data[p_evt->params.rx_data.length - 1] == '\r')
+        {
+            while (tapp_uart_put('\n') == NRF_ERROR_BUSY);
+        }
+    }
+
+}
+/**@snippet [Handling the data received over BLE] */
+
+
 /**@brief Function for initializing services that will be used by the application.
  */
+
 static void ble_services_init(void)
 {
     // ret_code_t         err_code;
+    ble_nus_init_t     nus_init;
     nrf_ble_qwr_init_t qwr_init = {0};
 
     // Initialize Queued Write Module.
@@ -312,6 +407,13 @@ static void ble_services_init(void)
 
     nrf_ble_qwr_init(&m_qwr, &qwr_init);
     // APP_ERROR_CHECK(err_code);
+
+    //Initialize nus
+    memset(&nus_init, 0, sizeof(nus_init));
+
+    nus_init.data_handler = nus_data_handler;
+
+    ble_nus_init(&m_nus, &nus_init);
 
     NRF_LOG_DEBUG("BLE Services init");
 }
@@ -377,11 +479,26 @@ static void ble_advertising_start(void)
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, TX_POWER_LEVEL);
     sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     bsp_board_led_on(ADVERTISING_LED);
-    bsp_board_led_off(LEDBUTTON_LED);
+    nrf_delay_ms(1000);
+    bsp_board_led_off(ADVERTISING_LED);
+    // bsp_board_led_off(LEDBUTTON_LED);
 
     NRF_LOG_INFO("Advertising Start \n\n");
 }
 
+// static void ble_advertising_stop(void)
+// {
+//     ret_code_t err_code = sd_ble_gap_adv_stop(m_adv_handle);
+//     APP_ERROR_CHECK(err_code);
+//     if(err_code == NRF_SUCCESS)
+//     {
+//         bsp_board_led_off(ADVERTISING_LED);
+//         bsp_board_led_on(LEDBUTTON_LED);
+//     }
+    
+
+//     NRF_LOG_INFO("Advertising Stop \n\n");
+// }
 
 /**@brief Function for handling BLE events.
  *
@@ -397,8 +514,8 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Connected");
 
-        bsp_board_led_on(CONNECTED_LED);
-        bsp_board_led_off(ADVERTISING_LED);
+        // bsp_board_led_on(CONNECTED_LED);
+        // bsp_board_led_off(ADVERTISING_LED);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_CONN, m_conn_handle, TX_POWER_LEVEL);
         nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -409,7 +526,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         NRF_LOG_INFO("Disconnected");
 
-        bsp_board_led_off(CONNECTED_LED);
+        // bsp_board_led_off(CONNECTED_LED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         // err_code = app_button_disable();
         // APP_ERROR_CHECK(err_code);
@@ -514,6 +631,22 @@ void ble_write_to_characteristic(uint8_t int_val, uint8_t dec_val, ble_gatts_cha
 //                                      PROCEDURES - MISC
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
+// /**
+//  * @brief Function for configuration of REGOUT0 register.
+//  */
+// void vddInit(void)
+// {
+//   if (NRF_UICR->REGOUT0 != UICR_REGOUT0_VOUT_3V3) 
+//   {
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;    //write enable
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+// 	NRF_UICR->REGOUT0 = UICR_REGOUT0_VOUT_3V3;                        //configurate REGOUT0
+// 	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+// 	while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+//         NVIC_SystemReset();                                               // Reset device
+//   } 
+// }
+
 static int decimal_part(double num){
   int intpart = (int)num;
   double decpart = num - intpart;
@@ -532,23 +665,35 @@ static int exponent_part(double num){
 // Init output pins
 void output_pin_init()
 {
-    nrf_gpio_cfg_output(output_pin);
      nrf_gpio_cfg_output(output_pin1);
-     nrf_gpio_cfg_output(output_pin2);
+    //  nrf_gpio_cfg_output(output_pin2);
      nrf_gpio_cfg_output(output_pin3);
      nrf_gpio_cfg_output(output_pin4);
      nrf_gpio_cfg_output(output_pin5);
     //  nrf_gpio_cfg_output(output_pin6);
-     nrf_gpio_cfg_output(output_pin7);
+    //  nrf_gpio_cfg_output(output_pin7);
+}
 
-    nrf_gpio_pin_set(output_pin); 
-      nrf_gpio_pin_set(output_pin1); 
-     nrf_gpio_pin_set(output_pin2); 
-      nrf_gpio_pin_set(output_pin3); 
+void output_pin_enable()
+{
+     nrf_gpio_pin_set(output_pin1); 
+    //  nrf_gpio_pin_set(output_pin2); 
+     nrf_gpio_pin_set(output_pin3); 
      nrf_gpio_pin_set(output_pin4);
      nrf_gpio_pin_set(output_pin5);
     //  nrf_gpio_pin_set(output_pin6);
-     nrf_gpio_pin_set(output_pin7);
+    //  nrf_gpio_pin_set(output_pin7);
+}
+
+void output_pin_disable()
+{
+    // nrf_gpio_pin_clear(output_pin1); 
+    //nrf_gpio_pin_clear(output_pin2); 
+    nrf_gpio_pin_clear(output_pin3); 
+    nrf_gpio_pin_clear(output_pin4);
+    //nrf_gpio_pin_clear(output_pin5);
+    //nrf_gpio_pin_set(output_pin6);
+    // nrf_gpio_pin_clear(output_pin7);
 }
 
 /*
@@ -580,6 +725,7 @@ static void log_init(void)
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
 }
+
 /**
  * @brief Function for confguring SAADC channel 0 for sampling AIN0 (P0.02).
  */
@@ -594,10 +740,14 @@ void saadc_init()
     saadc_config.oversample = NRF_SAADC_OVERSAMPLE_DISABLED;
     saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
 	
-    nrf_saadc_channel_config_t channel_1_config =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN5);
+    nrf_saadc_channel_config_t channel_1_config;
+    //     NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
+    channel_1_config.pin_p      = NRF_SAADC_INPUT_AIN5; // NRF_GPIO_PIN_MAP(0, 29)
+    channel_1_config.pin_n      = NRF_SAADC_INPUT_AIN0;
+    channel_1_config.mode       = NRF_SAADC_MODE_DIFFERENTIAL;
     channel_1_config.acq_time   = NRF_SAADC_ACQTIME_40US;
     channel_1_config.reference  = NRF_SAADC_REFERENCE_VDD4;
+    // channel_1_config.gain       = NRF_SAADC_GAIN1_6;
     channel_1_config.gain       = NRF_SAADC_GAIN1_4;
     channel_1_config.resistor_p = NRF_SAADC_RESISTOR_PULLUP;
     channel_1_config.resistor_n = NRF_SAADC_RESISTOR_PULLDOWN;
@@ -623,34 +773,66 @@ void saadc_init()
     nrf_drv_saadc_calibrate_offset();
 }
 
-void saadc_sample_write_ble()
+static void saadc_disable()
 {
     ret_code_t err_code;
-    nrf_saadc_value_t sample;
 
-    err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+	err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL1);
     APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_saadc_channel_uninit(SAADC_CHANNEL2);
+    APP_ERROR_CHECK(err_code);
+	nrf_drv_saadc_uninit();
+}
+
+
+void saadc_sample_write_ble()
+{   int buffy = 10;
+    char hot_boi[buffy];
     
-    // double V = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
-    // double V = (double)((sample * 3.002) / (pow(2,12)));
-    double V1 = (double)((sample * 3.025) / (pow(2,12)));
-    V1 *= ((63300 + 5600)/5600);
-    //double div = 0.96 + ((V1-19)*(0.04)/(14));
-    //V1 *= 1/div;
+    saadc_init();
+
+    ret_code_t err_code;
+    nrf_saadc_value_t sample;
+    double totalSamples;
+    for(int i = 0; i < 10; i++)
+    {
+        err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL1, &sample);
+        double V1 = (double)((sample * 3.334) / (pow(2,11)));
+        V1 *= (998 + 104.7)/(104.7);
+        totalSamples += V1;
+        nrf_delay_ms(50);
+    }
+    double V1 = totalSamples/10;
+    sprintf(hot_boi, "V1:%i.%i", exponent_part(V1),decimal_part(V1));
+    const uint8_t *kyle = (uint8_t*) hot_boi;
+    ble_send(kyle,buffy);
+
+    
+    APP_ERROR_CHECK(err_code);
+
     NRF_LOG_INFO("1st Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V1));
     ble_write_to_characteristic(exponent_part(V1), decimal_part(V1), voltage_1_char_handles);
+
+    nrf_delay_ms(1000);
 
     err_code = nrfx_saadc_sample_convert(SAADC_CHANNEL2, &sample);
     APP_ERROR_CHECK(err_code);
     
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
-    double V2 = (double)((sample * 3.025) / (pow(2,12)));
-    V2 *= ((11 + 4.7)/11);
+    double V2 = (double)((sample * 3.334) / (pow(2,12)));
+    V2 = V2 * 1.3;
+    sprintf(hot_boi, "V2:%i.%i", exponent_part(V2),decimal_part(V2));
+    kyle = (uint8_t*) hot_boi;
+    ble_send(kyle,buffy);
+    // V2 = 30;
     NRF_LOG_INFO( "2nd Voltage[V]: " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(V2));
     ble_write_to_characteristic(exponent_part(V2), decimal_part(V2), voltage_2_char_handles);
 
-    nrf_delay_ms(1000);}
+    nrf_delay_ms(1000);
+
+    saadc_disable();
+}
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
@@ -782,18 +964,25 @@ void TIMER3_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-                temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
+                temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
                 valid_temp_counter = 0;
+
 
                 expo = exponent_part(temperature);
                 temperature_encoded = decimal_part(temperature);
                 NRF_LOG_INFO("Temperature [Deg C] " NRF_LOG_FLOAT_MARKER "\r", NRF_LOG_FLOAT(temperature));
-                
+                int buffy = 10;
+                char hot_boi[buffy];
+
 
                 if(temp_sensor == false){
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_1_char_handles);
                     temp_sensor = true;
                     setup_gpiote_event(TEMP_SENSOR_2);
+                    //itoa(expo,hot_boi,10);
+                    sprintf(hot_boi, "T1:%i.%i", expo,temperature_encoded);
+                    const uint8_t *kyle = (uint8_t*) hot_boi;
+                    ble_send(kyle,buffy);
 
                     NRF_TIMER2->CC[0] = 0;
                     NRF_TIMER3->CC[2] = 0;
@@ -805,11 +994,14 @@ void TIMER3_IRQHandler(void)
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     temp_sensor = false;
                     saadc_sample_write_ble();
+                    sprintf(hot_boi, "T2:%i.%i", expo,temperature_encoded);
+                    const uint8_t *kyle = (uint8_t*) hot_boi;
+                    ble_send(kyle,buffy);
                     
                     NRF_TIMER2->CC[0] = 0;
                     NRF_TIMER3->CC[2] = 0;
                     NRF_TIMER3->CC[3] = 0;
-            ble_advertising_start();
+            // ble_advertising_start();
             // nrf_delay_ms(7000);
             // ble_advertising_stop();
 
@@ -867,23 +1059,76 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
     if (int_type == NRF_DRV_RTC_INT_TICK)
     {
         // perform some action
-        bsp_board_led_invert(ADVERTISING_LED);
+        // bsp_board_led_invert(ADVERTISING_LED);
     }
     else if (int_type == NRF_DRV_RTC_INT_COMPARE0)
     {
+        output_pin_enable();
+        ble_advertising_start();
         NRF_LOG_DEBUG("RTC compare event");
         bsp_board_led_invert(UNEXPECTED_LED);
+        nrf_delay_ms(1000);
+        bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
 
         // temp sensor code
+        output_pin_disable();
+        timer_init();
+        counter_init();
+        setup_gpiote_event(TEMP_SENSOR_1);
+        setup_timer_and_counter_ppi();
+        temp_sensor_measure();        
+        // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+        // nrf_delay_ms(5000);
+        output_pin_disable();
+        
 
 
-            timer_init();
-            counter_init();
-            setup_gpiote_event(TEMP_SENSOR_1);
-            setup_timer_and_counter_ppi();
-            temp_sensor_measure();        
+
+        // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
+        unsigned long RTC_CONFIG_CHARVAL = 2;
+        // Handle different cases. Mapping is as follows:
+        // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
+        switch (RTC_CONFIG_CHARVAL)
+        {
+        case RTC_VAL_IN_SEC: // Default
+
             nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
+            break;
+
+        case 0:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60 * 8,true);
+            break;
+
+        case 1:
+
+            nrf_drv_rtc_cc_set(&rtc,0,5*60 * 8,true);
+            break;
+
+        case 2:
+
+            nrf_drv_rtc_cc_set(&rtc,0,1*60*60 * 8,true);
+            break;
+
+        case 3:
+
+            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+            break;
+
+        case 4:
+
+            nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+            break;
+
+        }
     }
     else
     {
@@ -909,7 +1154,6 @@ static void rtc_config(void)
     err_code = nrf_drv_rtc_init(&rtc, &rtc_config, rtc_handler);
     APP_ERROR_CHECK(err_code); // check for errors
 
-    // Generate a tick event on each tick
     // nrf_drv_rtc_tick_enable(&rtc, true);
 
     err_code = nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
@@ -933,44 +1177,33 @@ static void rtc_start(void){
  */
 int main(void)
 {
+    
     log_init();
     NRF_LOG_FLUSH();
     NRF_LOG_INFO("Program Start!!!!");
     NRF_LOG_FLUSH();
     leds_init();
     output_pin_init();
-    saadc_init();
     ble_stack_init();
     ble_gap_params_init();
     ble_gatt_init();
     ble_services_init();
     ble_advertising_init();
     ble_connection_params_init();
-
-
+    
     // // call the clock configuration
     // lfclk_config();
 
     // call the rtc configuration
     rtc_config();
     rtc_start();
-
     
-
-    NRF_TIMER1->TASKS_START = 1;
-    NRF_TIMER2->TASKS_START = 1;
-
-
-    // Start execution.
-    // ret_code_t err_code;
-    // nrf_saadc_value_t sample;
-    // saadc_init();
     ble_advertising_start();
 
-
-
-    for(;;)
+    // Sleep in the while loop until an event is generated
+    while (true)
     {
+        
         NRF_LOG_FLUSH();
         // __SEV();
         // __WFE();

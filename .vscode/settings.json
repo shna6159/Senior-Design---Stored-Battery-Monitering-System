@@ -11,6 +11,8 @@
         "nrf_ble_scan.h": "c",
         "nrf_sdh_ble.h": "c",
         "ble_advdata.h": "c",
-        "ble.h": "c"
+        "ble.h": "c",
+        "*.bak": "c",
+        "nrf_ble_gatt.h": "c"
     }
 }
