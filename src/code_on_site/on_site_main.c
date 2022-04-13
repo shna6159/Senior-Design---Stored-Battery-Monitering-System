@@ -108,6 +108,150 @@ NRF_BLE_GQ_DEF(m_ble_gatt_queue,                                        /**< BLE
 
 static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - OPCODE_LENGTH - HANDLE_LENGTH; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
+//#define LED_USB_RESUME      (BSP_BOARD_LED_0)
+#define LED_CDC_ACM_OPEN    (BSP_BOARD_LED_0)
+#define LED_CDC_ACM_RX      (BSP_BOARD_LED_1)
+//#define LED_CDC_ACM_TX      (BSP_BOARD_LED_1)
+
+#ifndef USBD_POWER_DETECTION
+#define USBD_POWER_DETECTION true
+#endif
+
+
+static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
+                                    app_usbd_cdc_acm_user_event_t event);
+
+#define CDC_ACM_COMM_INTERFACE  0
+#define CDC_ACM_COMM_EPIN       NRF_DRV_USBD_EPIN2
+
+#define CDC_ACM_DATA_INTERFACE  1
+#define CDC_ACM_DATA_EPIN       NRF_DRV_USBD_EPIN1
+#define CDC_ACM_DATA_EPOUT      NRF_DRV_USBD_EPOUT1
+
+
+/**
+ * @brief CDC_ACM class instance
+ * */
+APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
+                            cdc_acm_user_ev_handler,
+                            CDC_ACM_COMM_INTERFACE,
+                            CDC_ACM_DATA_INTERFACE,
+                            CDC_ACM_COMM_EPIN,
+                            CDC_ACM_DATA_EPIN,
+                            CDC_ACM_DATA_EPOUT,
+                            APP_USBD_CDC_COMM_PROTOCOL_AT_V250
+);
+
+#define READ_SIZE 1
+
+static char m_rx_buffer[READ_SIZE];
+static char m_tx_buffer[NRF_DRV_USBD_EPSIZE];
+static bool m_send_flag = 1;
+int interval;
+
+static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
+                                    app_usbd_cdc_acm_user_event_t event)
+{
+    switch (event)
+    {
+        case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
+        {
+            //Setup first transfer
+            ret_code_t ret = app_usbd_cdc_acm_read(&m_app_cdc_acm,
+                                                   m_rx_buffer,
+                                                   READ_SIZE);
+            UNUSED_VARIABLE(ret);
+            break;
+        }
+        case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
+            //bsp_board_led_off(LED_CDC_ACM_OPEN);
+            break;
+        case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
+            //bsp_board_led_invert(LED_CDC_ACM_TX);
+            break;
+        case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
+        {
+            // LED ensures that RX is completed
+            bsp_board_led_invert(LED_CDC_ACM_OPEN);
+
+            // Using the amounts of bytes stored in buffer to determine interval
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 1)
+            {
+                interval = 0; //30 mins in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 2)
+            {
+                interval = 1; //1 hr in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 3)
+            {
+                interval = 2; //2 hr in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 4)
+            {
+                interval = 3; //6 hr in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 5)
+            {
+                interval = 4; //12 hr in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 6)
+            {
+                interval = 5; //1 day in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 7)
+            {
+                interval = 6; //1 week in sec
+            }
+            if (app_usbd_cdc_acm_bytes_stored(&m_app_cdc_acm) == 8)
+            {
+                interval = 7; //4 week in sec
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+static void usbd_user_ev_handler(app_usbd_event_type_t event)
+{
+    switch (event)
+    {
+        case APP_USBD_EVT_DRV_SUSPEND:
+            //bsp_board_led_off(LED_USB_RESUME);
+            break;
+        case APP_USBD_EVT_DRV_RESUME:
+            //bsp_board_led_on(LED_USB_RESUME);
+            break;
+        case APP_USBD_EVT_STARTED:
+            break;
+        case APP_USBD_EVT_STOPPED:
+            app_usbd_disable();
+            bsp_board_leds_off();
+            break;
+        case APP_USBD_EVT_POWER_DETECTED:
+            //NRF_LOG_INFO("USB power detected");
+
+            if (!nrf_drv_usbd_is_enabled())
+            {
+                app_usbd_enable();
+            }
+            break;
+        case APP_USBD_EVT_POWER_REMOVED:
+            //NRF_LOG_INFO("USB power removed");
+            app_usbd_stop();
+            break;
+        case APP_USBD_EVT_POWER_READY:
+            //NRF_LOG_INFO("USB ready");
+            app_usbd_start();
+            break;
+        default:
+            break;
+    }
+}
+
+
 /**@brief NUS UUID. */
 // static ble_uuid_t const m_nus_uuid =
 // {
@@ -250,6 +394,9 @@ static void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_le
     memcpy(data, &p_data[1], 5);
     data[5] = '\0';
     char flag = p_data[0];
+    bsp_board_led_invert(LED_CDC_ACM_RX);
+                nrf_delay_ms(500);
+                bsp_board_led_invert(LED_CDC_ACM_RX);
     switch (flag)
     {
     case 'a':
@@ -278,6 +425,64 @@ static void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_le
         {
             t2 = data;
             printf("%s\r\n",t2);
+            ret_code_t ret;
+            static const app_usbd_config_t usbd_config = {
+                .ev_state_proc = usbd_user_ev_handler
+            };
+
+            ret = NRF_LOG_INIT(NULL);
+            APP_ERROR_CHECK(ret);
+
+            ret = nrf_drv_clock_init();
+            APP_ERROR_CHECK(ret);
+            
+            nrf_drv_clock_lfclk_request(NULL);
+
+            while(!nrf_drv_clock_lfclk_is_running())
+            {
+                //Just waiting 
+            }
+
+            app_usbd_serial_num_generate();
+
+            ret = app_usbd_init(&usbd_config);
+            APP_ERROR_CHECK(ret);
+
+            app_usbd_class_inst_t const * class_cdc_acm = app_usbd_cdc_acm_class_inst_get(&m_app_cdc_acm);
+            ret = app_usbd_class_append(class_cdc_acm);
+            APP_ERROR_CHECK(ret);
+
+            if (USBD_POWER_DETECTION)
+            {
+                ret = app_usbd_power_events_enable();
+                APP_ERROR_CHECK(ret);
+            }
+            else
+            {
+                app_usbd_enable();
+                app_usbd_start();
+            }
+
+            while(true)
+            {
+                while (app_usbd_event_queue_process())
+                {
+                    //Nothing to do 
+                }
+                
+                if(m_send_flag)
+                {
+                    bsp_board_led_invert(0);
+
+                    size_t size = sprintf(m_tx_buffer, "%s,%s,%s,%s\r\n", t1,t2,v1,v2);
+                    ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, m_tx_buffer, size);
+
+                }  
+
+                UNUSED_RETURN_VALUE(NRF_LOG_PROCESS());
+                //Sleep CPU only if there was no interrupt since last loop processing 
+                __WFE();
+            }
         }
         t1 = '\0';
         v1 = '\0';
@@ -740,6 +945,13 @@ int main(void)
 
     // Start execution.
     printf("BLE UART central example started.\r\n");
+    bsp_board_led_invert(LED_CDC_ACM_RX);
+                nrf_delay_ms(1500);
+                bsp_board_led_invert(LED_CDC_ACM_RX);
+                nrf_delay_ms(1000);
+                bsp_board_led_invert(LED_CDC_ACM_RX);
+                nrf_delay_ms(1500);
+                bsp_board_led_invert(LED_CDC_ACM_RX);
     NRF_LOG_INFO("BLE UART central example started.");
     scan_start();
 

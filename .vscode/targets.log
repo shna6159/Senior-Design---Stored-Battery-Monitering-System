@@ -10,17 +10,17 @@ make.exe all --print-data-base --no-builtin-variables --no-builtin-rules --quest
 make.exe: *** No rule to make target `all'.  Stop.
 
 
-# Make data base, printed on Mon Apr 11 00:56:49 2022
+# Make data base, printed on Wed Apr 13 08:29:38 2022
 
 # Variables
 
 # automatic
+ 
 <D = $(patsubst %/,%,$(dir $<))
 # automatic
 ?F = $(notdir $?)
 # makefile
 MAKEFLAGS = Rrqp
- 
 # environment
 VSCODE_LOG_NATIVE = false
 # automatic
@@ -58,11 +58,11 @@ PROGRAMW6432 = C:\Program Files
 # environment
 PROGRAMDATA = C:\ProgramData
 # environment
-VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-ea21f6ef-4e29-464b-902f-005891a3b865-sock
+VSCODE_IPC_HOOK_EXTHOST = \\.\pipe\vscode-ipc-ccbd14e3-02ae-439b-9cd8-ffc8e3f9ff6b-sock
 # environment
 VSCODE_CWD = C:\Users\Nathan Zhao\AppData\Local\Programs\Microsoft VS Code
 # environment
-PATH = /c/Windows/system32:/c/Windows:/c/Windows/System32/Wbem:/c/Windows/System32/WindowsPowerShell/v1.0/:/c/Windows/System32/OpenSSH/:/c/Program Files/NVIDIA Corporation/NVIDIA NvDLISR:/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/c/Program Files/MATLAB/R2021b/bin:/c/Program Files/Git/cmd:/c/Program Files/PuTTY/:/c/Program Files (x86)/Nordic Semiconductor/nrf5x/bin/:/c/Program Files/Nordic Semiconductor/nrf-command-line-tools/bin/:/c/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin:/c/Users/Nathan Zhao/AppData/Local/Microsoft/WindowsApps:/c/Users/Nathan Zhao/AppData/Local/Programs/Microsoft VS Code/bin:/c/Users/Nathan Zhao/AppData/Local/GitHubDesktop/bin:/mingw/bin:/usr/bin:/c/Program Files/Nordic Semiconductor/nrf-command-line-tools/bin:.
+PATH = /c/Windows/system32:/c/Windows:/c/Windows/System32/Wbem:/c/Windows/System32/WindowsPowerShell/v1.0/:/c/Windows/System32/OpenSSH/:/c/Program Files/NVIDIA Corporation/NVIDIA NvDLISR:/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/c/Program Files/MATLAB/R2021b/bin:/c/Program Files/Git/cmd:/c/Program Files/PuTTY/:/c/Program Files (x86)/Nordic Semiconductor/nrf5x/bin/:/c/Program Files/Nordic Semiconductor/nrf-command-line-tools/bin/:/c/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin:/c/Users/Nathan Zhao/AppData/Local/Microsoft/WindowsApps:/c/Users/Nathan Zhao/AppData/Local/Programs/Microsoft VS Code/bin:/c/Users/Nathan Zhao/AppData/Local/GitHubDesktop/bin:/mingw/bin:/usr/bin:/c/Program Files/Nordic Semiconductor/nrf-command-line-tools/bin:":/c/Python27":.
 # environment
 COMMONPROGRAMW6432 = C:\Program Files\Common Files
 # environment
@@ -84,7 +84,7 @@ ELECTRON_RUN_AS_NODE = 1
 # automatic
 %F = $(notdir $%)
 # environment
-CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_8216_DPHBQFPSSHTXHDAF
+CHROME_CRASHPAD_PIPE_NAME = \\.\pipe\crashpad_3864_JZQNOQKQQWUHKCPS
 # environment
 VSCODE_PIPE_LOGGING = true
 # environment
@@ -168,6 +168,7 @@ COMSPEC = C:\Windows\system32\cmd.exe
 # default
 MAKEFILES := 
 # automatic
+ 
 <F = $(notdir $<)
 # environment
 LC_ALL = C
@@ -196,11 +197,10 @@ TERM = cygwin
 # environment
 FPS_BROWSER_APP_PROFILE_STRING = Internet Explorer
 # environment
-VSCODE_PID = 8216
+VSCODE_PID = 3864
 # environment
 USERDOMAIN_ROAMINGPROFILE = DESKTOP-J2GK0MG
 # variable set hash-table stats:
- 
 # Load=92/1024=9%, Rehash=0, Collisions=9/114=8%
 
 # Pattern-specific Variable Values
@@ -284,6 +284,6 @@ GNUmakefile:
 # strcache free: total = 0 / max = 0 / min = 4096 / avg = 0
  
 
-# Finished Make data base on Mon Apr 11 00:56:49 2022
+# Finished Make data base on Wed Apr 13 08:29:38 2022
 
  

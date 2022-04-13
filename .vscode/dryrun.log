@@ -1,7 +1,6 @@
-make.exe --dry-run --keep-going --print-directory
+make.exe --dry-run --always-make --keep-going --print-directory
 make.exe: Entering directory `/c/Users/Nathan Zhao/Desktop/School/Capstone/Code/Senior-Design---Stored-Battery-Monitering-System'
+make.exe: Leaving directory `/c/Users/Nathan Zhao/Desktop/School/Capstone/Code/Senior-Design---Stored-Battery-Monitering-System'
  
 make.exe: *** No targets specified and no makefile found.  Stop.
 
-make.exe: Leaving directory `/c/Users/Nathan Zhao/Desktop/School/Capstone/Code/Senior-Design---Stored-Battery-Monitering-System'
- 
