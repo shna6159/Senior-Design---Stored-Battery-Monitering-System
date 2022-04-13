@@ -687,11 +687,11 @@ void output_pin_enable()
 
 void output_pin_disable()
 {
-    // nrf_gpio_pin_clear(output_pin1); 
+    nrf_gpio_pin_clear(output_pin1); 
     //nrf_gpio_pin_clear(output_pin2); 
     nrf_gpio_pin_clear(output_pin3); 
     nrf_gpio_pin_clear(output_pin4);
-    //nrf_gpio_pin_clear(output_pin5);
+    nrf_gpio_pin_clear(output_pin5);
     //nrf_gpio_pin_set(output_pin6);
     // nrf_gpio_pin_clear(output_pin7);
 }
@@ -790,6 +790,8 @@ void saadc_sample_write_ble()
     char hot_boi[buffy];
     
     saadc_init();
+
+    nrf_delay_ms(1000);
 
     ret_code_t err_code;
     nrf_saadc_value_t sample;
@@ -1001,6 +1003,8 @@ void TIMER3_IRQHandler(void)
                     NRF_TIMER2->CC[0] = 0;
                     NRF_TIMER3->CC[2] = 0;
                     NRF_TIMER3->CC[3] = 0;
+                    
+            output_pin_disable();
             // ble_advertising_start();
             // nrf_delay_ms(7000);
             // ble_advertising_stop();
@@ -1079,21 +1083,19 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         nrf_rtc_task_trigger(rtc.p_reg, NRF_RTC_TASK_CLEAR);
 
         // temp sensor code
-        output_pin_disable();
         timer_init();
         counter_init();
         setup_gpiote_event(TEMP_SENSOR_1);
         setup_timer_and_counter_ppi();
         temp_sensor_measure();        
         // nrf_drv_rtc_cc_set(&rtc,0,RTC_VAL_IN_SEC * 8,true);
-        // nrf_delay_ms(5000);
-        output_pin_disable();
+        //nrf_delay_ms(10000);
         
 
 
 
         // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
-        unsigned long RTC_CONFIG_CHARVAL = 2;
+        unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
         // Handle different cases. Mapping is as follows:
         // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
         switch (RTC_CONFIG_CHARVAL)

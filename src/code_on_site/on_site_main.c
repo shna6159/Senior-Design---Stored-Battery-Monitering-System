@@ -233,6 +233,10 @@ static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
     ble_nus_c_on_db_disc_evt(&m_ble_nus_c, p_evt);
 }
 
+char *v1 = '\0';
+char *v2 = '\0';
+char *t1 = '\0';
+char *t2 = '\0';
 
 /**@brief Function for handling characters received by the Nordic UART Service (NUS).
  *
@@ -242,9 +246,50 @@ static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
 static void ble_nus_chars_received_uart_print(uint8_t * p_data, uint16_t data_len)
 {
  //   ret_code_t ret_val;
-
+    char data[6];
+    memcpy(data, &p_data[1], 5);
+    data[5] = '\0';
+    char flag = p_data[0];
+    switch (flag)
+    {
+    case 'a':
+        if (*t1 == '\0')
+        {
+            t1 = data;
+            printf("%s\r\n",t1);
+        }
+        break;
+    case 'b':
+        if (*v1 == '\0')
+        {
+            v1 = data;
+            printf("%s\r\n",v1);
+        }
+        break;
+    case 'c':
+        if (*v2 == '\0')
+        {
+            v2 = data;
+            printf("%s\r\n",v2);
+        }
+        break;
+    case 'd':
+        if (*t2 == '\0')
+        {
+            t2 = data;
+            printf("%s\r\n",t2);
+        }
+        t1 = '\0';
+        v1 = '\0';
+        v2 = '\0';
+        t2 = '\0';
+        break;
+    
+    default:
+        break;
+    }
     //printf("Receiving data.\r\n");
-    printf("%s\r\n", p_data);
+    //printf("%s\r\n", p_data);
 
     // for (uint32_t i = 0; i < data_len; i++)
     // {
