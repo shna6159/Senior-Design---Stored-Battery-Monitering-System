@@ -150,13 +150,11 @@ class GUI(tk.Tk):
             try:
                 serialcomm = serial.Serial("COM6", 115200)
                 serialcomm.timeout = 1
-                print("yay?")
             except serial.SerialException:
                 print("WUT")
 
             # Getting Values
-            if serialcomm.inWaiting():    
-                print("asdsad")
+            if serialcomm.inWaiting():
                 time.sleep(5)
                 string = serialcomm.readline().decode('ascii').strip()
                 arr = string.split(',')
@@ -209,7 +207,7 @@ class GUI(tk.Tk):
                     interval = "11111111\r" #8bytes = 2416200 seconds
 
                 # Write Interval to dongle
-                serialcomm.write(interval.encode())
+                #serialcomm.write(interval.encode())
 
                 # Sending Alert Email Temp
                 if temp1 > root.temp_High_User or root.temp_Low_User > temp1 or temp2 > root.temp_High_User or root.temp_Low_User > temp2:

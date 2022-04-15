@@ -804,8 +804,8 @@ void saadc_sample_write_ble()
         totalSamples += V1;
         nrf_delay_ms(50);
     }
-    double V1 = totalSamples/10;
-    sprintf(hot_boi, "V1:%i.%i", exponent_part(V1),decimal_part(V1));
+    double V1 = 14.22;//totalSamples/10;
+    sprintf(hot_boi, "b%i.%i", exponent_part(V1),decimal_part(V1));
     const uint8_t *kyle = (uint8_t*) hot_boi;
     ble_send(kyle,buffy);
 
@@ -823,8 +823,8 @@ void saadc_sample_write_ble()
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
     double V2 = (double)((sample * 3.334) / (pow(2,12)));
-    V2 = V2 * 1.3;
-    sprintf(hot_boi, "V2:%i.%i", exponent_part(V2),decimal_part(V2));
+    V2 = 4.20;//V2 * 1.3;
+    sprintf(hot_boi, "c%i.%i", exponent_part(V2),decimal_part(V2));
     kyle = (uint8_t*) hot_boi;
     ble_send(kyle,buffy);
     // V2 = 30;
@@ -966,7 +966,7 @@ void TIMER3_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-                temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
+                temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
                 valid_temp_counter = 0;
 
 
@@ -982,7 +982,7 @@ void TIMER3_IRQHandler(void)
                     temp_sensor = true;
                     setup_gpiote_event(TEMP_SENSOR_2);
                     //itoa(expo,hot_boi,10);
-                    sprintf(hot_boi, "T1:%i.%i", expo,temperature_encoded);
+                    sprintf(hot_boi, "a%i.%i", expo,temperature_encoded);
                     const uint8_t *kyle = (uint8_t*) hot_boi;
                     ble_send(kyle,buffy);
 
@@ -996,7 +996,7 @@ void TIMER3_IRQHandler(void)
                     ble_write_to_characteristic(expo, temperature_encoded, temperature_2_char_handles);
                     temp_sensor = false;
                     saadc_sample_write_ble();
-                    sprintf(hot_boi, "T2:%i.%i", expo,temperature_encoded);
+                    sprintf(hot_boi, "d%i.%i", expo,temperature_encoded);
                     const uint8_t *kyle = (uint8_t*) hot_boi;
                     ble_send(kyle,buffy);
                     
