@@ -355,18 +355,56 @@ static uint32_t tapp_uart_put(uint8_t byte){
  * @param[in] p_evt       Nordic UART Service event.
  */
 /**@snippet [Handling the data received over BLE] */
+
+int interval = 0;
+
 static void nus_data_handler(ble_nus_evt_t * p_evt)
 {
 
     if (p_evt->type == BLE_NUS_EVT_RX_DATA)
     {
-        bsp_board_led_invert(UNEXPECTED_LED);
-        nrf_delay_ms(500);
-        bsp_board_led_invert(UNEXPECTED_LED);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(500);
+        // bsp_board_led_invert(UNEXPECTED_LED);
         uint32_t err_code;
 
-        printf("Received data from BLE NUS. Writing data on UART.\r\n");
-        printf("%s\r\n", p_evt->params.rx_data.p_data);
+        //printf("Received data from BLE NUS. Writing data on UART.\r\n");
+        //printf("%s\r\n", p_evt->params.rx_data.p_data);
+        // Using the amounts of bytes stored in buffer to determine interval
+        int rate = p_evt->params.rx_data.length;
+    
+            if (rate == 1)
+            {
+                interval = 0; //1 min in sec
+            }
+            if (rate == 2)
+            {
+                interval = 1; //5 min in sec
+            }
+            if (rate == 3)
+            {
+                interval = 2; //1 hr in sec
+            }
+            if (rate == 4)
+            {
+                interval = 3; //6 hr in sec
+            }
+            if (rate == 5)
+            {
+                interval = 4; //12 hr in sec
+            }
+            if (rate == 6)
+            {
+                interval = 5; //1 day in sec
+            }
+            if (rate == 7)
+            {
+                interval = 6; //1 week in sec
+            }
+            if (rate == 8)
+            {
+                interval = 7; //4 week in sec
+            }
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
         
 
@@ -804,7 +842,7 @@ void saadc_sample_write_ble()
         totalSamples += V1;
         nrf_delay_ms(50);
     }
-    double V1 = 14.22;//totalSamples/10;
+    double V1 = totalSamples/10;
     sprintf(hot_boi, "b%i.%i", exponent_part(V1),decimal_part(V1));
     const uint8_t *kyle = (uint8_t*) hot_boi;
     ble_send(kyle,buffy);
@@ -823,7 +861,7 @@ void saadc_sample_write_ble()
     // double V2 = (double)((sample * 4 * NRF_SAADC_REFERENCE_VDD4) / (pow(2,12)));
     // double V2 = (double)((sample * 3.002) / (pow(2,12)));
     double V2 = (double)((sample * 3.334) / (pow(2,12)));
-    V2 = 4.20;//V2 * 1.3;
+    V2 = V2 * 1.3;
     sprintf(hot_boi, "c%i.%i", exponent_part(V2),decimal_part(V2));
     kyle = (uint8_t*) hot_boi;
     ble_send(kyle,buffy);
@@ -966,7 +1004,7 @@ void TIMER3_IRQHandler(void)
                 }
                 average_duty_cycle = average_duty_cycle / NUM_TEMPERATURE_PERIODS;
                 // NRF_LOG_INFO("Averaged Duty Cycle " NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(average_duty_cycle));
-                temperature = 6.9;//-1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
+                temperature = -1.43 * average_duty_cycle * average_duty_cycle + 214.56 * average_duty_cycle - 68.60;
                 valid_temp_counter = 0;
 
 
@@ -1070,9 +1108,9 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
         output_pin_enable();
         ble_advertising_start();
         NRF_LOG_DEBUG("RTC compare event");
-        bsp_board_led_invert(UNEXPECTED_LED);
-        nrf_delay_ms(1000);
-        bsp_board_led_invert(UNEXPECTED_LED);
+        // bsp_board_led_invert(UNEXPECTED_LED);
+        // nrf_delay_ms(1000);
+        // bsp_board_led_invert(UNEXPECTED_LED);
         // nrf_delay_ms(1000);
         // bsp_board_led_invert(UNEXPECTED_LED);
         // nrf_delay_ms(1000);
@@ -1095,10 +1133,10 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
 
 
         // unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC; // Replace with characteristic reading (may not even need to do anything)
-        unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
+        //unsigned long RTC_CONFIG_CHARVAL = RTC_VAL_IN_SEC;
         // Handle different cases. Mapping is as follows:
         // 0->1min, 1->5min, 2->1hr, 3->8hr, 4->24hr
-        switch (RTC_CONFIG_CHARVAL)
+        switch (interval)
         {
         case RTC_VAL_IN_SEC: // Default
 
@@ -1122,14 +1160,28 @@ static void rtc_handler(nrfx_rtc_int_type_t int_type)
 
         case 3:
 
-            nrf_drv_rtc_cc_set(&rtc,0,8*60*60 * 8,true);
+            nrf_drv_rtc_cc_set(&rtc,0,6*60*60 * 8,true);
             break;
 
         case 4:
 
+            nrf_drv_rtc_cc_set(&rtc,0,12*60*60 * 8,true);
+            break;
+        
+        case 5:
+
             nrf_drv_rtc_cc_set(&rtc,0,24*60*60 * 8,true);
+            break; 
+
+        case 6:
+
+            nrf_drv_rtc_cc_set(&rtc,0,7*24*60*60 * 8,true);
             break;
 
+        case 7:
+
+            nrf_drv_rtc_cc_set(&rtc,0,4*7*24*60*60 * 8,true);
+            break;
         }
     }
     else

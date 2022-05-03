@@ -188,26 +188,27 @@ class GUI(tk.Tk):
                 root.txtarea.insert(END, data)
                 tf.close()
 
+                interval = "\r"
                 # Getting Interval 
-                if root.dur_User == "1 minutes":
-                    interval = "1\r" #1byte = 1800 seconds
+                if root.dur_User == "1 minute":
+                    interval = "\r" #1byte = 1800 seconds
                 if root.dur_User == "5 minutes":
-                    interval = "11\r" #2bytes = 3600 seconds
-                if root.dur_User == "1 hours":
-                    interval = "111\r" #3bytes = 7200 seconds
+                    interval = "1\r" #2bytes = 3600 seconds
+                if root.dur_User == "1 hour":
+                    interval = "11\r" #3bytes = 7200 seconds
                 if root.dur_User == "6 hours":
-                    interval = "1111\r" #4bytes = 21600 seconds
+                    interval = "111\r" #4bytes = 21600 seconds
                 if root.dur_User == "12 hours":
-                    interval = "11111\r" #5bytes = 43200 seconds
+                    interval = "1111\r" #5bytes = 43200 seconds
                 if root.dur_User == "1 day":
-                    interval = "111111\r" #6bytes = 86400 seconds
+                    interval = "11111\r" #6bytes = 86400 seconds
                 if root.dur_User == "1 week":
-                    interval = "1111111\r" #7bytes = 604800 seconds
+                    interval = "111111\r" #7bytes = 604800 seconds
                 if root.dur_User == "4 weeks":
-                    interval = "11111111\r" #8bytes = 2416200 seconds
+                    interval = "1111111\r" #8bytes = 2416200 seconds
 
                 # Write Interval to dongle
-                #serialcomm.write(interval.encode())
+                serialcomm.write(interval.encode())
 
                 # Sending Alert Email Temp
                 if temp1 > root.temp_High_User or root.temp_Low_User > temp1 or temp2 > root.temp_High_User or root.temp_Low_User > temp2:
